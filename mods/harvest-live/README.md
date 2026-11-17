@@ -1,3 +1,5 @@
+<img src=".claude-plugin/icon.png" width="72" alt="" align="right">
+
 # harvest-live
 
 A Claude Code mod that keeps your [Harvest](https://www.getharvest.com) timer next to your work. On the first prompt of a workday it opens a small band above the prompt, lets Claude pick the Harvest project, task and a short description from what you asked, and starts the timer when you press **Start**.
@@ -61,6 +63,9 @@ pbpaste | jq -Rc '{harvestToken: .}' | claude plugin configure harvest-live@agen
 The token can do anything your Harvest user can. The mod only reads your project assignments, your running timer, and creates or stops your own time entries.
 
 ## Privacy
+
+This is an independent project, not made or endorsed by Harvest.
+
 
 Your prompt text, the current folder's path and your Harvest project and task names are sent to Claude (Sonnet and Haiku) to make the suggestion. Nothing is sent anywhere else besides the Harvest API.
 

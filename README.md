@@ -28,9 +28,11 @@ Mods are Claude Code plugins, installed from this repository's plugin marketplac
 
 | Mod | Description | Install |
 |-----|-------------|---------|
-| [`harvest-live`](mods/harvest-live) | Harvest time tracking above the prompt: suggests a project, task and description from your first prompt of the day and starts the timer in one press. Connects with your own Harvest token. | `/plugin install harvest-live --marketplace tdebooij/agent-tools` |
+| [`harvest-live`](mods/harvest-live) | Harvest time tracking above the prompt: suggests a project, task and description from your first prompt of the day and starts the timer in one press. Connect your Harvest account from the band with one pasted token. | `/plugin install harvest-live --marketplace tdebooij/agent-tools` |
 
-See each mod's README for setup.
+In the Claude desktop app, where `/plugin` doesn't run: click **+** next to the prompt box, then **Plugins**, **Add marketplace** with `tdebooij/agent-tools`, then **Add plugin**. From a shell: `claude plugin install <mod> --marketplace tdebooij/agent-tools`.
+
+Update installed mods with `claude plugin marketplace update agent-tools`, then `claude plugin update <mod>@agent-tools`. See each mod's README for setup.
 
 ---
 
