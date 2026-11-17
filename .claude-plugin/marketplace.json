@@ -1,0 +1,11 @@
+{
+  "name": "agent-tools",
+  "owner": { "name": "tdebooij" },
+  "plugins": [
+    {
+      "name": "harvest-live",
+      "source": "./mods/harvest-live",
+      "description": "Harvest time tracking above the Claude Code prompt: suggests a project, task and description from your first prompt of the day and starts the timer in one press."
+    }
+  ]
+}

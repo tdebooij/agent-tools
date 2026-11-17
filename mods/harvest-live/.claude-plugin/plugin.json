@@ -1,0 +1,22 @@
+{
+  "name": "harvest-live",
+  "version": "1.0.0",
+  "description": "Harvest time tracking above the Claude Code prompt: suggests a project, task and description from your first prompt of the day and starts the timer in one press.",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "harvestToken": {
+      "type": "string",
+      "title": "Harvest personal access token",
+      "description": "Create one at https://id.getharvest.com/developers",
+      "sensitive": true,
+      "required": false
+    },
+    "harvestAccountId": {
+      "type": "string",
+      "title": "Harvest account ID",
+      "description": "Shown next to your token at https://id.getharvest.com/developers",
+      "required": false
+    }
+  }
+}
