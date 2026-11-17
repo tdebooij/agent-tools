@@ -1,0 +1,28 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "harvest-live",
+  "version": "0.1.0",
+  "description": "Review and confirm a Harvest time entry in Codex using your connected Harvest tools.",
+  "author": {
+    "name": "Tim de Booij"
+  },
+  "license": "MIT",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Harvest Live",
+        "shortDescription": "Track time from your chat",
+        "longDescription": "Review and confirm a Harvest time entry in Codex using your connected Harvest tools.",
+        "developerName": "Tim de Booij",
+        "category": "Productivity",
+        "capabilities": [
+          "Interactive"
+        ],
+        "logo": "./assets/icon.png",
+        "composerIcon": "./assets/icon.png",
+        "defaultPrompt": "Open Harvest Live for this work."
+      },
+      "hooks": "./hooks/hooks.json"
+    }
+  }
+}
