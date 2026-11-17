@@ -361,6 +361,28 @@ async function start($: any) {
   }
 }
 
+// When the band opens by itself, from the mod's settings (shown in /config). /harvest works any time.
+const minutes = (hhmm: unknown, fallback: number) => {
+  const m = String(hhmm ?? '').trim().match(/^(\d{1,2})(?::(\d{2}))?$/)
+  return m ? Math.min(24 * 60, Number(m[1]) * 60 + Number(m[2] ?? 0)) : fallback
+}
+const DAYS: Record<string, number[]> = {
+  'Monday to Friday': [1, 2, 3, 4, 5],
+  'Monday to Saturday': [1, 2, 3, 4, 5, 6],
+  'Every day': [0, 1, 2, 3, 4, 5, 6],
+  Never: [],
+}
+const workingHours = (options: Record<string, unknown>) => ({
+  start: minutes(options.workStart, 9 * 60),
+  end: minutes(options.workEnd, 18 * 60),
+  days: DAYS[String(options.workDays ?? '')] ?? DAYS['Monday to Friday']!,
+})
+let hours = workingHours({})
+const isWorkTime = (now: Date) => {
+  const m = now.getHours() * 60 + now.getMinutes()
+  return hours.days.includes(now.getDay()) && m >= hours.start && m < hours.end
+}
+
 // Glyph icons on every surface: an Svg drew nothing in the desktop band.
 const ICONS = {
   track: { glyph: '◷', color: 'claude' },
@@ -371,6 +393,7 @@ const ICONS = {
 
 export const register: Register = (on, options) => {
   creds = { token: String(options.harvestToken ?? '').trim(), accountId: String(options.harvestAccountId ?? '').trim() }
+  hours = workingHours(options)
 
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'harvest', description: 'Open the Harvest band (/harvest refresh: refetch projects and tasks)' })
@@ -430,11 +453,11 @@ export const register: Register = (on, options) => {
     return ran
   })
 
-  // First prompt of a session, and the first one on a later day (a resumed chat): Mon-Fri 9-18, unless --no-harvest.
+  // First prompt of a session, and the first one on a later day (a resumed chat), within the working hours set, unless --no-harvest.
   // Opens the panel and pre-fills in the background, never waits.
   on('prompt.submit', async ($, e, next) => {
     const now = new Date(await $.clock.now())
-    const isWork = now.getDay() >= 1 && now.getDay() <= 5 && now.getHours() >= 9 && now.getHours() < 18
+    const isWork = isWorkTime(now)
     const today = now.toDateString()
     const { value: lastDay = '' } = await $.state.get(day)
     if (isWork && lastDay !== today && !e.text.includes('--no-harvest')) {

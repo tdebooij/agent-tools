@@ -2,7 +2,7 @@
 
 # harvest-live
 
-A Claude Code mod that keeps your [Harvest](https://www.getharvest.com) timer next to your work. On the first prompt of a workday it opens a small band above the prompt, lets Claude pick the Harvest project, task and a short description from what you asked, and starts the timer when you press **Start**.
+A Claude Code mod that keeps your [Harvest](https://www.getharvest.com) timer next to your work. On the first prompt of every new chat during working hours it opens a small band above the prompt, lets Claude pick the Harvest project, task and a short description from what you asked, and starts the timer when you press **Start**.
 
 ```
 ◷ Harvest                                            [Ignore]
@@ -14,7 +14,7 @@ Description  Fix the login redirect  ✎
 
 ## What it does
 
-- **First prompt of the day** (Monday to Friday, 9:00–18:00): the band opens and Claude suggests a project, task and description in the background. Your turn is never held up. Add `--no-harvest` to a prompt to skip it.
+- **First prompt of each new chat** during your working hours (Monday to Friday, 9:00–18:00 unless you change them), and again the next day in a chat you keep using: the band opens and Claude suggests a project, task and description in the background. Your turn is never held up. Add `--no-harvest` to a prompt to skip it.
 - **One spinner while it decides**, then the filled-in rows. Click a value to change it; your choice always wins over a late suggestion.
 - **Start** creates a running time entry in Harvest. If a timer is already running, the button says **Switch** and stops that one first.
 - **`/harvest`** opens the band any time; `/harvest <what you're doing>` gets a suggestion for that text; `/harvest refresh` refetches your projects and tasks (they're cached for a day).
@@ -61,6 +61,18 @@ pbpaste | jq -Rc '{harvestToken: .}' | claude plugin configure harvest-live@agen
 `claude plugin configure harvest-live@agent-tools` shows what's set. The account ID is found from the token when it's left empty.
 
 The token can do anything your Harvest user can. The mod only reads your project assignments, your running timer, and creates or stops your own time entries.
+
+## Working hours
+
+The band only opens by itself during your working hours. Change them in `/config`, under the harvest-live rows:
+
+| Setting | Default | |
+|---|---|---|
+| Working days | Monday to Friday | Also *Monday to Saturday*, *Every day*, or *Never* to only open it with `/harvest` |
+| Working hours start | `09:00` | 24-hour `HH:MM` |
+| Working hours end | `18:00` | 24-hour `HH:MM`; `24:00` for the end of the day |
+
+Or from a shell: `echo '{"workStart": "08:00", "workEnd": "17:00"}' | claude plugin configure harvest-live@agent-tools --values-stdin`. `/harvest` works at any time.
 
 ## Privacy
 
