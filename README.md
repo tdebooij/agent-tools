@@ -1,6 +1,6 @@
-# agent-skills
+# agent-tools
 
-Personal library of AI agent skills — reusable instructions that extend Claude, Codex, and other skill-aware agents with my own workflows and conventions.
+Personal library of AI agent tools: **skills** (reusable instructions that extend Claude, Codex, and other skill-aware agents with my own workflows and conventions) and **Claude Code mods** (plugins that change Claude Code's own interface and behaviour).
 
 ---
 
@@ -16,9 +16,23 @@ Skills live in `.agents/skills/<name>/` inside a project, or globally in `~/.age
 
 | Skill | Description | Install |
 |-------|-------------|---------|
-| `tim-pr-review` | Personal PR review workflow — checks a PR against the `9to5-web-dev` skill's conventions plus general correctness, security, and overengineering concerns, then walks through issues one at a time in severity order with fix options. | `npx skills add tdebooij/agent-skills@tim-pr-review` |
+| `tim-pr-review` | Personal PR review workflow — checks a PR against the `9to5-web-dev` skill's conventions plus general correctness, security, and overengineering concerns, then walks through issues one at a time in severity order with fix options. | `npx skills add tdebooij/agent-tools@tim-pr-review` |
 
 > New skills added to this repo will appear here.
+
+---
+
+## Available Mods
+
+Mods are Claude Code plugins, installed from this repository's plugin marketplace.
+
+| Mod | Description | Install |
+|-----|-------------|---------|
+| [`harvest-live`](mods/harvest-live) | Harvest time tracking above the prompt: suggests a project, task and description from your first prompt of the day and starts the timer in one press. Connect your Harvest account from the band with one pasted token. | `/plugin install harvest-live --marketplace tdebooij/agent-tools` |
+
+In the Claude desktop app, where `/plugin` doesn't run: click **+** next to the prompt box, then **Plugins**, **Add marketplace** with `tdebooij/agent-tools`, then **Add plugin**. From a shell: `claude plugin install <mod> --marketplace tdebooij/agent-tools`.
+
+Update installed mods with `claude plugin marketplace update agent-tools`, then `claude plugin update <mod>@agent-tools`. See each mod's README for setup.
 
 ---
 
@@ -27,7 +41,7 @@ Skills live in `.agents/skills/<name>/` inside a project, or globally in `~/.age
 Skills are installed using the [`skills` CLI](https://skills.sh):
 
 ```bash
-npx skills add tdebooij/agent-skills@<skill-name>
+npx skills add tdebooij/agent-tools@<skill-name>
 ```
 
 ### Project-level install
@@ -36,7 +50,7 @@ Installs into the current project so the skill is versioned alongside the repo:
 
 ```bash
 cd your-project
-npx skills add tdebooij/agent-skills@tim-pr-review --agent universal --yes
+npx skills add tdebooij/agent-tools@tim-pr-review --agent universal --yes
 ```
 
 ### Global install
@@ -44,7 +58,7 @@ npx skills add tdebooij/agent-skills@tim-pr-review --agent universal --yes
 Installs the skill for every project on this machine:
 
 ```bash
-npx skills add tdebooij/agent-skills@tim-pr-review -g
+npx skills add tdebooij/agent-tools@tim-pr-review -g
 ```
 
 ### Keeping skills up to date
@@ -64,7 +78,11 @@ Re-running `add` on an installed skill replaces the local copy with the latest v
 ## Repository Structure
 
 ```
-agent-skills/
+agent-tools/
+├── .claude-plugin/
+│   └── marketplace.json      ← lists the mods for /plugin install
+├── mods/
+│   └── <mod-name>/           ← one Claude Code plugin per folder
 └── .agents/
     └── skills/
         └── <skill-name>/

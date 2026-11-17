@@ -1,0 +1,35 @@
+{
+  "name": "harvest-live",
+  "version": "1.0.0",
+  "description": "Harvest time tracking above the Claude Code prompt: suggests a project, task and description from your first prompt of the day and starts the timer in one press.",
+  "author": {
+    "name": "tdebooij",
+    "url": "https://github.com/tdebooij"
+  },
+  "homepage": "https://github.com/tdebooij/agent-tools/tree/main/mods/harvest-live",
+  "repository": "https://github.com/tdebooij/agent-tools",
+  "license": "MIT",
+  "keywords": [
+    "harvest",
+    "time-tracking",
+    "timer",
+    "mod"
+  ],
+  "icon": "./.claude-plugin/icon.png",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "harvestToken": {
+      "type": "string",
+      "title": "Harvest personal access token",
+      "description": "Leave empty and connect from the Harvest band, or paste a token from https://id.getharvest.com/developers",
+      "sensitive": true,
+      "required": false
+    },
+    "harvestAccountId": {
+      "type": "string",
+      "title": "Harvest account ID",
+      "description": "Leave empty: found from your token when you connect in the band",
+      "required": false
+    }
+  }
+}
