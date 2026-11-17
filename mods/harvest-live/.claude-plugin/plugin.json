@@ -30,6 +30,30 @@
       "title": "Harvest account ID",
       "description": "Leave empty: found from your token when you connect in the band",
       "required": false
+    },
+    "workStart": {
+      "type": "string",
+      "title": "Working hours start",
+      "description": "From this time (HH:MM) the band opens on the first prompt of a new chat",
+      "default": "09:00"
+    },
+    "workEnd": {
+      "type": "string",
+      "title": "Working hours end",
+      "description": "Until this time (HH:MM)",
+      "default": "18:00"
+    },
+    "workDays": {
+      "type": "string",
+      "title": "Working days",
+      "description": "Days the band opens by itself; /harvest works any time",
+      "options": [
+        "Monday to Friday",
+        "Monday to Saturday",
+        "Every day",
+        "Never"
+      ],
+      "default": "Monday to Friday"
     }
   }
 }

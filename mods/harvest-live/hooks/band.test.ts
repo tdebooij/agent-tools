@@ -140,3 +140,4 @@ test('project and task show as text until Change is pressed', CONNECTED, async (
   expect(await ui.find({ type: 'Select' })).toBeDefined()
   await ui.unmount()
 })
+
