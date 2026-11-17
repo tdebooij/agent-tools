@@ -16,6 +16,9 @@ declare module 'claude-code' {
       edited: boolean
       busy: '' | 'suggest' | 'start'
       frame: number
+      connected: boolean
+      connectNote: string
+      accounts: Option[]
       editField: '' | 'project' | 'task' | 'notes'
       phase: 'edit' | 'done'
       isOpen: boolean

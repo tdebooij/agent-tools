@@ -14,7 +14,11 @@ const harvestStub = (on: any, calls: string[]) =>
   on('http.fetch', (_$: unknown, e: { url: string; init?: { method?: string } }) => {
     const path = e.url.replace('https://api.harvestapp.com/v2', '')
     calls.push(`${e.init?.method ?? 'GET'} ${path.split('?')[0]}`)
-    const body = path.startsWith('/users/me/project_assignments')
+    if (e.url.startsWith('https://id.getharvest.com/'))
+      calls.push(`GET ${e.url}`)
+    const body = e.url.startsWith('https://id.getharvest.com/api/v2/accounts')
+      ? { user: { first_name: 'Sam' }, accounts: [{ id: 123, name: 'Example Company', product: 'harvest' }] }
+      : path.startsWith('/users/me/project_assignments')
       ? {
           project_assignments: [
             { project: { id: 1, name: 'Website' }, client: { name: 'Example Client' }, task_assignments: [{ task: { id: 7, name: 'Development' } }] },
@@ -56,8 +60,24 @@ test('without a token the band says how to connect, and calls nothing', async ($
   await $.command.run({ command: 'harvest', args: '' } as never)
   await clock.advance(1000)
   const ui = await $.ui.mount({ plugin: 'harvest-live', surface: 'desktop', ...BAND })
-  expect(await ui.find({ type: 'Text', text: /Harvest not connected/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Connect Harvest/ })).toBeDefined()
   expect(calls.length).toBe(0)
+  await ui.unmount()
+})
+
+test('pasting a token in the band connects, finds the account and shows the fields', async ($, on) => {
+  const clock = mock.clock(on)
+  mock.store(on)
+  on('ui.render', ($, e) => h($.ui.resolve(e).Box, {}) as never)
+  const calls: string[] = []
+  harvestStub(on, calls)
+  await $.command.run({ command: 'harvest', args: '' } as never)
+  const ui = await $.ui.mount({ plugin: 'harvest-live', surface: 'desktop', ...BAND })
+  await ui.input({ key: 'token', text: 'pasted-token' })
+  await clock.advance(1000)
+  expect(calls).toContain('GET https://id.getharvest.com/api/v2/accounts')
+  expect(await ui.find({ type: 'Text', text: /Connect Harvest/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /Website · Example Client/ })).toBeDefined()
   await ui.unmount()
 })
 

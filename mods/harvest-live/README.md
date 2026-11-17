@@ -42,22 +42,21 @@ In the Claude desktop app: click **+** next to the prompt box, then **Plugins**,
 
 The mod talks to the Harvest API directly with your own personal access token; it doesn't need a Harvest MCP server or CLI.
 
-1. Go to [id.getharvest.com/developers](https://id.getharvest.com/developers) and click **Create new personal access token**.
-2. Copy the **token** and your **Account ID** from that page.
-3. Enter both when the install asks for the mod's settings:
-   - **Harvest personal access token** is kept in Claude Code's secure storage, not in a settings file.
-   - **Harvest account ID** is stored in `~/.claude/settings.json` under `pluginConfigs`.
+The first time the band opens it shows **Connect Harvest**:
 
-Until both are set, the band shows *Harvest not connected* and calls nothing.
+1. Click **Open Harvest's token page**, then **Create new personal access token** on that page.
+2. Copy the token and paste it into the band. Press Enter.
+3. The mod checks the token with Harvest and finds your account by itself (if you have several, it asks which one). The band then switches to the timer.
 
-To see or change them later:
+The token is saved in Claude Code's secure storage (it runs `claude plugin configure` for you), so you connect once. If `claude` isn't on your `PATH`, the band says *for this session only* and you connect again next session.
+
+You can also set it from a shell, with the token on your clipboard:
 
 ```bash
-claude plugin configure harvest-live
-pbpaste | jq -Rc '{harvestToken: .}' | claude plugin configure harvest-live --values-stdin   # token from your clipboard
+pbpaste | jq -Rc '{harvestToken: .}' | claude plugin configure harvest-live@agent-tools --values-stdin
 ```
 
-Options you leave out keep their values, so you can set the account ID the same way with `{"harvestAccountId": "123456"}`. Start a new session afterwards.
+`claude plugin configure harvest-live@agent-tools` shows what's set. The account ID is found from the token when it's left empty.
 
 The token can do anything your Harvest user can. The mod only reads your project assignments, your running timer, and creates or stops your own time entries.
 

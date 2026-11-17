@@ -94,10 +94,77 @@ async function track($: any, tool: string, text?: string) {
 
 // Your Harvest credentials, from the mod's settings (the token is kept in the system keychain).
 let creds = { token: '', accountId: '' }
-const NOT_CONNECTED = 'Harvest not connected: set your token and account ID (see the mod README)'
+const NOT_CONNECTED = 'Harvest is not connected yet'
+const TOKEN_PAGE = 'https://id.getharvest.com/developers'
+const connected = { plugin: 'harvest-live', key: 'connected' } as const
+const connectNote = { plugin: 'harvest-live', key: 'connectNote' } as const
+const accounts = { plugin: 'harvest-live', key: 'accounts' } as const
+// A pasted token waiting for the person to pick one of several Harvest accounts.
+let pendingToken = ''
+
+// Checks a pasted token with Harvest, finds its account, and keeps both.
+async function connect($: any, pasted: string) {
+  const token = pasted.trim()
+  if (!token) return
+  await $.state.set(connectNote, 'Checking your token…')
+  try {
+    const r = await $.http.fetch('https://id.getharvest.com/api/v2/accounts', {
+      headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'harvest-live Claude Code mod' },
+    })
+    if (r.status === 401) return $.state.set(connectNote, "Harvest didn't accept that token. Copy it again from the token page.")
+    if (!r.ok) return $.state.set(connectNote, `Harvest answered ${r.status}. Try again in a moment.`)
+    const body = parse(r.text)
+    const list: Option[] = (body.accounts ?? [])
+      .filter((a: any) => !a.product || a.product === 'harvest')
+      .map((a: any) => ({ value: String(a.id), label: String(a.name) }))
+    if (list.length === 0) return $.state.set(connectNote, 'That token has no Harvest account.')
+    const who = [body.user?.first_name, body.user?.last_name].filter(Boolean).join(' ')
+    if (list.length > 1) {
+      pendingToken = token
+      await $.state.set(accounts, list)
+      return $.state.set(connectNote, `Hi${who ? ` ${who}` : ''}, which Harvest account?`)
+    }
+    await save($, token, list[0]!, who)
+  } catch (err) {
+    await $.state.set(connectNote, `Couldn't reach Harvest: ${(err as Error).message}`)
+  }
+}
+
+async function save($: any, token: string, account: Option, who = '') {
+  creds = { token, accountId: account.value }
+  pendingToken = ''
+  await $.state.set(accounts, [])
+  // Keep it for later sessions: the token goes to Claude Code's secure storage, like a value set at install.
+  const values = JSON.stringify({ harvestToken: token, harvestAccountId: account.value })
+  let isSaved = false
+  for (const id of [`${$.plugin.name}@agent-tools`, $.plugin.name]) {
+    try {
+      const r = await $.process.run(['claude', 'plugin', 'configure', id, '--values-stdin'], { stdin: values, timeoutMs: 20000 })
+      if (r.exitCode === 0) {
+        isSaved = true
+        break
+      }
+    } catch {
+      // No claude on PATH, or no host commands here: fall through to "this session only".
+    }
+  }
+  await $.state.set(connectNote, `Connected${who ? ` as ${who}` : ''} · ${account.label}${isSaved ? '' : ' (for this session only)'}`)
+  await $.state.set(connected, true)
+  void loadRunning($)
+  void seed($)
+}
 
 async function api($: any, method: string, path: string, body?: unknown) {
-  if (!creds.token || !creds.accountId) throw new Error(NOT_CONNECTED)
+  if (!creds.token) throw new Error(NOT_CONNECTED)
+  if (!creds.accountId) {
+    // A token set from the shell without an account ID: use its first Harvest account.
+    const r = await $.http.fetch('https://id.getharvest.com/api/v2/accounts', {
+      headers: { Authorization: `Bearer ${creds.token}`, 'User-Agent': 'harvest-live Claude Code mod' },
+    })
+    const first = (parse(r.text).accounts ?? []).find((a: any) => !a.product || a.product === 'harvest')
+    if (!r.ok || !first) throw new Error('Harvest refused your token')
+    creds = { ...creds, accountId: String(first.id) }
+  }
   const r = await $.http.fetch(`${API}${path}`, {
     method,
     headers: {
@@ -349,6 +416,7 @@ export const register: Register = (on, options) => {
     await $.state.set(phase, 'edit')
     await $.state.set(editing, '')
     await $.state.set(isOpen, true)
+    if (!creds.token) return { text: 'Harvest panel opened. Connect your account in it.' }
     void loadRunning($)
     if (e.args.trim()) void prefill($, e.args)
     else void seed($)
@@ -372,6 +440,7 @@ export const register: Register = (on, options) => {
     if (isWork && lastDay !== today && !e.text.includes('--no-harvest')) {
       await $.state.set(day, today)
       await $.state.set(isOpen, true)
+      if (!creds.token) return next(e)
       void loadRunning($)
       void prefill($, e.text)
       // Only point Claude at the tool when this session really has it.
@@ -385,8 +454,50 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const { value: open = false } = await $.state.get(isOpen)
     if (!open || e.props.hasSurvey) return next(e)
-    const { Box, Text, Button, Select, Input } = $.ui.resolve(e)
+    const { Box, Text, Button, Select, Input, Link } = $.ui.resolve(e)
     const icon = (name: keyof typeof ICONS) => <Text color={ICONS[name].color}>{ICONS[name].glyph}</Text>
+    const close = () => $.state.set(isOpen, false)
+
+    // Set at install (creds), or just now in this band (the state write redraws it).
+    const { value: hasJustConnected = false } = await $.state.get(connected)
+    const isConnected = !!creds.token || hasJustConnected
+    if (!isConnected) {
+      const { value: hello = '' } = await $.state.get(connectNote)
+      const { value: choices = [] } = await $.state.get(accounts)
+      const isBad = /^(Harvest didn't|Harvest answered|That token|Couldn't)/.test(hello)
+      return (
+        <Box flexDirection="column" gap={1}>
+          <Box gap={1} alignItems="center">
+            {icon('track')}
+            <Box flexGrow={1}>
+              <Text bold>Connect Harvest</Text>
+            </Box>
+            <Button key="ignore" role="dismiss" variant="secondary" hotkey="x" label="Ignore" onPress={close} />
+          </Box>
+          <Text dimColor wrap="wrap">
+            Track time from here. Create a personal access token on Harvest's token page, then paste it below. It's saved in Claude Code's secure storage.
+          </Text>
+          <Link href={TOKEN_PAGE} label="Open Harvest's token page ↗" />
+          {choices.length ? (
+            <Select
+              key="account"
+              autoFocus
+              options={[{ value: '', label: 'Choose an account' }, ...choices]}
+              value=""
+              onSelect={v => {
+                const pick = choices.find(c => c.value === v)
+                if (pick && pendingToken) return save($, pendingToken, pick)
+              }}
+            />
+          ) : (
+            <Input key="token" autoFocus placeholder="Paste your token here" submitLabel="connect" onSubmit={v => connect($, v)} />
+          )}
+          {hello ? (
+            <Text color={isBad ? 'warning' : undefined} dimColor={!isBad} wrap="wrap">{hello}</Text>
+          ) : null}
+        </Box>
+      )
+    }
     const { value: t = null } = await $.state.get(timer)
     await $.state.get(tick) // redraws the running clock every 30 s
     const { value: projectList = [] } = await $.state.get(projects)
@@ -397,7 +508,6 @@ export const register: Register = (on, options) => {
     const { value: work = '' } = await $.state.get(busy)
     const seconds = t ? Math.max(0, Math.floor((await $.clock.now() - t.startedAt) / 1000)) : 0
     const isError = /^(Harvest |No Harvest|Pick a project)/.test(note)
-    const close = () => $.state.set(isOpen, false)
 
     if (step === 'done' && t) {
       return (
@@ -429,7 +539,7 @@ export const register: Register = (on, options) => {
             control
           ) : (
             // The value itself is the control: no separate button column at the right edge.
-            <Button key={`edit-${name}`} plain hover={{ scope: `field-${name}`, underline: true }} label={`${label}: ${value || empty}`} onPress={edit(name)}>
+            <Button key={`edit-${name}`} plain hover={{ scope: `field-${name}`, underline: true }} onPress={edit(name)}>
               <Text dimColor={!value}>{value || empty}</Text>
               <Text dimColor>{name === 'notes' ? '  ✎' : '  ▾'}</Text>
             </Button>
