@@ -2,7 +2,7 @@
 
 # harvest-live
 
-A Claude Code mod that keeps your [Harvest](https://www.getharvest.com) timer next to your work. On the first prompt of a workday it opens a small band above the prompt, lets Claude pick the Harvest project, task and a short description from what you asked, and starts the timer when you press **Start**.
+A Claude Code mod that keeps your [Harvest](https://www.getharvest.com) timer next to your work. On the first prompt of every new chat during working hours it opens a small band above the prompt, lets Claude pick the Harvest project, task and a short description from what you asked, and starts the timer when you press **Start**.
 
 ```
 ◷ Harvest                                            [Ignore]
@@ -14,7 +14,7 @@ Description  Fix the login redirect  ✎
 
 ## What it does
 
-- **First prompt of the day** (Monday to Friday, 9:00–18:00): the band opens and Claude suggests a project, task and description in the background. Your turn is never held up. Add `--no-harvest` to a prompt to skip it.
+- **First prompt of each new chat** (Monday to Friday, 9:00–18:00), and again the next day in a chat you keep using: the band opens and Claude suggests a project, task and description in the background. Your turn is never held up. Add `--no-harvest` to a prompt to skip it.
 - **One spinner while it decides**, then the filled-in rows. Click a value to change it; your choice always wins over a late suggestion.
 - **Start** creates a running time entry in Harvest. If a timer is already running, the button says **Switch** and stops that one first.
 - **`/harvest`** opens the band any time; `/harvest <what you're doing>` gets a suggestion for that text; `/harvest refresh` refetches your projects and tasks (they're cached for a day).
