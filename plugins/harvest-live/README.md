@@ -4,7 +4,7 @@ Review the running Harvest timer and an editable proposal in a desktop chat. The
 
 ## Install
 
-Requires Node.js 18 or newer on the Codex PATH and an authenticated Harvest connection with project, assignment, and timer tools. The plugin uses that connection through Codex. It does not store a second token, call an external model, or require an npm install.
+Requires Node.js 18 or newer on the Codex PATH. The local plugin talks directly to Harvest ID and the Harvest API. Each person connects their own account from the card.
 
 From the root of this checkout:
 
@@ -13,9 +13,15 @@ codex plugin marketplace add .
 codex plugin add harvest-live@agent-tools
 ```
 
-Review and trust the installed prompt hook in Codex if prompted. Open a **new desktop chat** with a normal work request. The hook asks Codex to display the card on the first substantive prompt during working hours. Include the standalone flag `--no-harvest` in that opening prompt to skip it for that chat. You can also ask “Open Harvest Live” or “Refresh Harvest Live” at any time. A personal Harvest hook should use this card when available and reserve its old question for fallback.
+Review and trust the installed prompt hook in Codex if prompted. Open a **new desktop chat** with a normal work request. The hook asks Codex to display the card on the first substantive prompt during working hours. Include the standalone flag `--no-harvest` in that opening prompt to skip it for that chat. You can also ask “Open Harvest Live” or “Refresh Harvest Live” at any time.
 
 The timer and working-hours views follow the Codex theme. Open **Appearance → Theme** to choose **Dark**, **Light**, or **Follow Codex**. The card remembers your choice when the host allows local storage.
+
+## Connect your Harvest account
+
+Open **Harvest Live** and expand **Harvest account**, or ask “Open my Harvest Live account settings”. Select **Create a personal access token on Harvest**, paste the token into the password field and press **Connect account**. Harvest identifies the available time-tracking accounts. Pick one if you have several. The card displays the verified user and workspace. Use **Replace token** to rotate credentials and **Disconnect** to remove the local saved token. Revocation is available on Harvest’s developer page.
+
+The browser encrypts the pasted token for the local plugin process before submitting it through the MCP Apps bridge. Chat messages, tool results, and the package contain no saved token. The plugin uses macOS Keychain or Windows current-user DPAPI. On Linux it stores the token unencrypted in an owner-only file (0600) under the user’s Harvest Live config directory. People who share an OS login share this configuration. This is a local desktop plugin. Do not deploy its local credential storage as a shared hosted service.
 
 ## Working hours
 
@@ -23,14 +29,14 @@ The default is Monday to Friday, 09:00 inclusive to 18:00 exclusive, in the loca
 
 ## How the card works
 
-Codex reads the current timer and project assignments via Harvest, suggests a project, task and description, and calls this plugin's read-only `show_timer` tool. The HTML view runs locally and uses the MCP Apps bridge. Choosing a project whose tasks have not been fetched reveals **Load tasks**, which asks Codex to reopen the draft with its verified assignments. **Refresh** fetches current data. Edited notes are preserved in either request.
+Codex uses the plugin’s read-only context tool to suggest a project and task from your own assignments. The timer card fetches current data and handles Start, Switch and Refresh directly. Before a switch, the plugin checks the account, project/task assignment and running entry again. A stale proposal requires review. Harvest confirms the new entry before the card reports success. Dismiss makes no time-entry changes.
 
-Start and Switch send an explicit confirmation to this chat. Codex compares the current timer with the ID reviewed in the card and checks the project/task pair. A changed timer requires a new decision. The chat reports the verified result or a partial failure. Existing cards are snapshots. A host without MCP Apps rendering needs the chat fallback. Hook-driven display requires an enabled, trusted hook and a model tool call.
+Concurrent writes from different chats use a per-user lock. If a server is forcibly terminated mid-operation, check the timer in Harvest and confirm the process ID in `account-operation.lock` is no longer running before removing that file from the Harvest Live config directory.
 
 ## Test
 
 ```sh
-node --test plugins/harvest-live/test.mjs
+node --test plugins/harvest-live/*.test.mjs plugins/harvest-live/test.mjs
 ```
 
 The self-check uses synthetic data and never contacts Harvest.

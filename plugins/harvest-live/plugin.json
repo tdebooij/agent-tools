@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "harvest-live",
-  "version": "0.1.1",
-  "description": "Review and confirm a Harvest time entry in Codex using your connected Harvest tools.",
+  "version": "0.2.0",
+  "description": "Review and confirm a Harvest time entry in Codex using your own Harvest personal access token.",
   "author": {
     "name": "Tim de Booij"
   },
@@ -12,7 +12,7 @@
       "interface": {
         "displayName": "Harvest Live",
         "shortDescription": "Track time from your chat",
-        "longDescription": "Review and confirm a Harvest time entry in Codex using your connected Harvest tools.",
+        "longDescription": "Review and confirm a Harvest time entry in Codex using your own Harvest personal access token.",
         "developerName": "Tim de Booij",
         "category": "Productivity",
         "capabilities": [

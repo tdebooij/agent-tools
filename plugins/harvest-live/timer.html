@@ -12,7 +12,7 @@ header,.actions,.snapshot,.brand{display:flex;align-items:center;gap:12px}header
 button{cursor:pointer;font:600 .92rem system-ui;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:9px 14px;min-height:44px}.primary{background:var(--accent);border-color:var(--accent);color:var(--on)}button:disabled{opacity:.55;cursor:default}button:hover:enabled{filter:brightness(.94)}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .actions{justify-content:flex-end;flex-wrap:wrap;margin-top:18px}.subtle{font-size:.87rem;margin:8px 0 0}.subtle:empty{display:none}#status{margin-bottom:0}fieldset{border:0;margin:0;padding:0;min-width:0}legend{position:absolute;clip-path:inset(50%)}[hidden]{display:none!important}
 @media(max-width:440px){.fields{grid-template-columns:1fr}.actions button{flex:1}.snapshot{align-items:flex-start}.elapsed{font-size:.82rem}}
-details{border-top:1px solid var(--line);margin-top:16px;padding-top:6px}summary{cursor:pointer;font-size:.88rem;color:var(--muted);padding:10px 0}.schedule{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}@media(max-width:440px){.schedule{grid-template-columns:1fr 1fr}.schedule>div:first-child{grid-column:1/-1}}
+a{color:var(--accent)}details{border-top:1px solid var(--line);margin-top:16px;padding-top:6px}summary{cursor:pointer;font-size:.88rem;color:var(--muted);padding:10px 0}.schedule{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}@media(max-width:440px){.schedule{grid-template-columns:1fr 1fr}.schedule>div:first-child{grid-column:1/-1}}
 </style>
 <style id="dark-palette" media="(prefers-color-scheme: dark)">
 :root{--surface:#201e1b;--ink:#f6efe4;--muted:#c4baad;--line:#81786b;--wash:#302c26;--accent:#ffac80;--on:#32150a;--live:#9ed5a7}
@@ -42,6 +42,16 @@ applyTheme();
 <div><label for="project">Project</label><select id="project" required></select></div><div><label for="task">Task</label><select id="task"></select></div>
 <label class="wide">Description<input id="notes" type="text" maxlength="4000" required placeholder="What are you working on?"></label></div>
 <p id="hint" class="subtle"></p><div class="actions"><button type="button" id="dismiss">Dismiss</button><button class="primary" id="submit" type="submit">Start timer</button></div></fieldset></form>
+<details id="accountPanel"><summary>Harvest account</summary>
+<p id="identity" class="subtle"></p>
+<form id="connectForm"><fieldset id="accountFields"><legend>Connect Harvest</legend>
+<p><a id="tokenLink" href="https://id.getharvest.com/developers" target="_blank" rel="noopener noreferrer">Create a personal access token on Harvest ↗</a></p>
+<label for="token">Personal access token</label>
+<input id="token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" required aria-describedby="tokenHint">
+<p class="subtle" id="tokenHint"></p>
+<div id="workspaceField" hidden><label for="workspace">Harvest account</label><select id="workspace"></select></div>
+<div class="actions"><button id="disconnect" type="button" hidden>Disconnect</button><button type="submit" id="connect" class="primary">Connect account</button></div>
+</fieldset></form></details>
 <details id="settings" hidden><summary>Working hours</summary><form id="scheduleForm"><div class="schedule">
 <div><label for="days">Working days</label><select id="days"><option value="weekdays">Monday to Friday</option><option value="mon-sat">Monday to Saturday</option><option value="every-day">Every day</option><option value="never">Never</option></select></div>
 <div><label for="start">Start</label><input id="start" type="time" required></div>
@@ -83,7 +93,7 @@ function post(message) {
 function request(method, params) {
   return new Promise((resolve,reject) => {
     const id = ++sequence;
-    const timeout = setTimeout(() => { pending.delete(id); reject(new Error('Host did not reply')); }, 12000);
+    const timeout = setTimeout(() => { pending.delete(id); reject(new Error('Host did not reply')); }, method === 'tools/call' ? 90000 : 12000);
     pending.set(id, result => { clearTimeout(timeout); result.error ? reject(new Error(result.error.message)) : resolve(result.result); });
     post({id,method,params});
   });
@@ -96,16 +106,14 @@ function fill(select, placeholder, options, value) {
 }
 function updateTask(value) {
   const p = selected();
-  fill(task, p && !p.tasks ? 'Load tasks for this project' : 'Choose a task', p?.tasks ?? [], value);
+  fill(task, 'Choose a task', p?.tasks ?? [], value);
   task.disabled = !p?.tasks?.length;
   updateAction();
 }
 function updateAction() {
-  const load = selected() && !selected().tasks;
-  el('submit').textContent = load ? 'Load tasks' : data.running ? 'Switch timer' : 'Start timer';
-  el('submit').disabled = !load && !(project.value && task.value && notes.value.trim());
-  el('submit').formNoValidate = Boolean(load);
-  el('hint').textContent = !data.projects.length ? 'No active projects are available for this account.' : load ? 'Load the assigned tasks to continue.' : selected()?.tasks?.length === 0 ? 'This project has no available tasks.' : data.running ? 'Switching stops the timer above and starts a separate entry.' : '';
+  el('submit').textContent = data.running ? 'Switch timer' : 'Start timer';
+  el('submit').disabled = !(project.value && task.value && notes.value.trim());
+  el('hint').textContent = !data.projects.length ? 'No active projects are available for this account.' : selected()?.tasks?.length === 0 ? 'This project has no available tasks.' : data.running ? 'Switching stops the timer above and starts a separate entry.' : '';
 }
 function drawTime() {
   const start = Date.parse(data?.running?.started_at);
@@ -127,7 +135,19 @@ el('scheduleForm').onsubmit = async event => {
   } catch (err) { el('status').textContent = err.message; }
   finally { button.disabled = false; }
 };
-function render(next, schedule) {
+function render(next, meta = {}) {
+  const schedule = meta.schedule;
+  if (Object.hasOwn(meta,'account')) showIdentity(meta.account);
+  if (meta.tokenStorage) el('tokenHint').textContent = 'Saved for you in '+meta.tokenStorage+'.';
+  if (next?.accountOnly) {
+    resetTimer();
+    showIdentity(next.account);
+    el('accountPanel').open = true;
+    el('status').textContent = next.connectionError ?? '';
+    if (schedule) el('settings').hidden = false;
+    if (schedule) for (const k of ['days','start','end']) el(k).value = schedule[k];
+    return;
+  }
   if (schedule || next?.settingsOnly) {
     el('settings').hidden = false;
     const values = schedule ?? next.schedule ?? {days:'weekdays',start:'09:00',end:'18:00'};
@@ -139,9 +159,13 @@ function render(next, schedule) {
     if (next.settingsError) el('status').textContent = 'Saved settings could not be read. Select and save your working hours.';
     return;
   }
+  if (next?.projects && !next.connection_ref) {
+    resetTimer(); el('status').textContent = 'Open Harvest Live again to use your personal account.'; return;
+  }
   if (!next || !Array.isArray(next.projects) || !Object.hasOwn(next,'running') || finished) return;
   const draft = dirty ? {project_id:Number(project.value),task_id:Number(task.value),notes:notes.value} : next;
   data = next;
+  document.querySelector('.snapshot').hidden = false;
   const r = data.running;
   el('state').textContent = r ? 'Running now' : 'Current timer';
   el('state').classList.toggle('live', Boolean(r));
@@ -154,42 +178,112 @@ function render(next, schedule) {
 project.onchange = () => { dirty = true; updateTask(); };
 task.onchange = notes.oninput = () => { dirty = true; updateAction(); };
 function lock(value) { el('fields').disabled = value; el('refresh').disabled = value; }
-async function send(kind) {
-  if (finished || el('fields').disabled || !data) return;
-  lock(true);
-  const p = selected();
-  const selection = {expected_running_id:data.running?.id ?? null,project_id:p?.id ?? null,task_id:Number(task.value) || null,notes:notes.value};
-  const text = kind+'\n'+JSON.stringify(selection);
-  try {
-    const result = await request('ui/message',{role:'user',content:[{type:'text',text}]});
-    if (result?.isError) { lock(false); el('status').textContent = 'Codex declined the request. You can try again.'; return; }
-    finished = true; el('form').hidden = true; el('refresh').hidden = true;
-    el('state').textContent = 'At the time of your request'; el('elapsed').hidden = true;
-    el('status').textContent = 'Request sent. Codex will report the Harvest result in chat.';
-  } catch {
-    // A lost response can follow a successful send. Require a new proposal before retrying.
-    finished = true; el('status').textContent = 'Delivery could not be verified. Check the chat, then ask Codex to refresh Harvest Live.';
-  }
+let account = null, encryptedToken;
+function showIdentity(value) {
+  account = value;
+  el('identity').textContent = account ? account.name+' · '+account.workspace : 'Connect your Harvest account to track time.';
+  el('disconnect').hidden = !account;
+  el('connect').textContent = account ? 'Replace token' : 'Connect account';
 }
-el('form').onsubmit = e => { e.preventDefault(); if (el('submit').disabled) return;
-  send(!selected().tasks ? 'Load Harvest Live tasks for the selected project and reopen this draft. Read only.' : data.running ? 'I confirm: stop the shown Harvest timer and start a separate entry with this selection. Recheck the running ID first.' : 'I confirm: start a new Harvest entry with this selection only if no timer is running.');
+function resetTimer() {
+  data = undefined; dirty = false; finished = false; lock(false);
+  el('form').reset(); el('form').hidden = true; el('refresh').hidden = true;
+  document.querySelector('.snapshot').hidden = true; el('elapsed').hidden = false;
+}
+async function callTool(name,args) {
+  const result = await request('tools/call',{name,arguments:args});
+  if (result.isError) throw new Error(result.content?.[0]?.text || 'The request failed.');
+  return result;
+}
+function clearSecret() {
+  encryptedToken = undefined; el('token').value = ''; el('token').required = true;
+  el('workspace').required = false; el('workspace').replaceChildren(); el('workspaceField').hidden = true;
+}
+el('token').oninput = () => { encryptedToken = undefined; el('workspaceField').hidden = true; el('workspace').required = false; el('token').required = true; };
+async function refreshPersonal(keepDraft) {
+  const state = (await callTool('read_personal_context',{})).structuredContent;
+  if (!state.account) { render({accountOnly:true,account:null}); return; }
+  if (!keepDraft || state.account.ref !== data?.connection_ref) resetTimer();
+  else dirty = true;
+  showIdentity(state.account);
+  finished = false;
+  render({...state,connection_ref:state.account.ref,notes:''});
+  lock(false);
+}
+el('connectForm').onsubmit = async event => {
+  event.preventDefault();
+  el('accountFields').disabled = true;
+  try {
+    if (!encryptedToken) {
+      const key = (await callTool('get_token_key',{}))._meta.key;
+      const publicKey = await crypto.subtle.importKey('jwk',key,{name:'RSA-OAEP',hash:'SHA-256'},false,['encrypt']);
+      const bytes = await crypto.subtle.encrypt({name:'RSA-OAEP'},publicKey,new TextEncoder().encode(el('token').value.trim()));
+      encryptedToken = btoa(String.fromCharCode(...new Uint8Array(bytes)));
+      el('token').value = ''; el('token').required = false;
+    }
+    const choice = el('workspaceField').hidden ? null : Number(el('workspace').value);
+    const response = (await callTool('connect_account',{expected_ref:account?.ref ?? null,encrypted_token:encryptedToken,account_id:choice})).structuredContent;
+    if (response.accounts) {
+      fill(el('workspace'),'Choose an account',response.accounts);
+      el('workspaceField').hidden = false; el('workspace').required = true;
+      el('status').textContent = 'Choose the account to connect.';
+      return;
+    }
+    clearSecret(); resetTimer(); showIdentity(response.account);
+    el('status').textContent = 'Account connected.'; el('accountPanel').open = false;
+    await refreshPersonal(false);
+  } catch (err) { clearSecret(); el('status').textContent = err.message; }
+  finally { el('accountFields').disabled = false; el('workspace').required = !el('workspaceField').hidden; }
 };
-el('refresh').onclick = () => send('Refresh Harvest Live from Harvest and reopen this draft. Read only.');
+el('disconnect').onclick = async () => {
+  if (!account) return;
+  el('accountFields').disabled = true;
+  try {
+    await callTool('disconnect_account',{expected_ref:account.ref});
+    clearSecret(); render({accountOnly:true,account:null}); el('status').textContent = 'Saved token removed.';
+  } catch (err) { el('status').textContent = err.message; }
+  finally { el('accountFields').disabled = false; }
+};
+el('form').onsubmit = async event => {
+  event.preventDefault();
+  if (!data || finished || el('fields').disabled || el('submit').disabled) return;
+  lock(true);
+  try {
+    const choice = {connection_ref:data.connection_ref,expected_running_id:data.running?.id ?? null,project_id:Number(project.value),task_id:Number(task.value),notes:notes.value};
+    const result = await callTool('start_personal_timer',choice);
+    dirty = false;
+    render({...data,running:result.structuredContent.running,notes:notes.value});
+    finished = true; el('form').hidden = true; el('refresh').disabled = false;
+    el('status').textContent = 'Harvest confirmed your new timer.';
+  } catch (err) {
+    // A timeout can follow a successful write. Require fresh data before another submission.
+    finished = true; el('refresh').disabled = false; el('status').textContent = err.message+' Refresh to review the current timer.';
+  }
+};
+el('refresh').onclick = async () => {
+  lock(true);
+  try { await refreshPersonal(true); el('status').textContent = 'Timer refreshed.'; }
+  catch (err) { el('status').textContent = err.message; el('refresh').disabled = false; }
+};
 el('dismiss').onclick = () => { finished = true; el('form').hidden = true; el('refresh').hidden = true; el('status').textContent = 'Dismissed. No timer action requested.'; };
 window.addEventListener('message', e => {
   if (e.source !== parent || (hostOrigin && hostOrigin !== 'null' && e.origin !== hostOrigin) || e.data?.jsonrpc !== '2.0') return;
   const msg = e.data;
   if (pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
   else if (msg.method === 'ui/notifications/host-context-changed') updateHostTheme(msg.params);
-  else if (msg.method === 'ui/notifications/tool-result') render(msg.params.structuredContent,msg.params._meta?.schedule);
+  else if (msg.method === 'ui/notifications/tool-result') render(msg.params.structuredContent,msg.params._meta);
   else if (msg.method === 'ui/resource-teardown') post({id:msg.id,result:{}});
 });
 setInterval(drawTime,30000);
 try {
-  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.1.1'},appCapabilities:{},protocolVersion:'2026-01-26'});
+  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.2.0'},appCapabilities:{},protocolVersion:'2026-01-26'});
   updateHostTheme(host.hostContext);
   post({method:'ui/notifications/initialized',params:{}});
   new ResizeObserver(() => post({method:'ui/notifications/size-changed',params:{height:Math.ceil(document.body.getBoundingClientRect().height)}})).observe(document.body);
-  if (!host.hostCapabilities?.message?.text) { finished = true; el('current').textContent = 'Open the timer in a desktop chat that supports messages.'; }
+  if (host.hostCapabilities?.openLinks) el('tokenLink').onclick = async event => {
+    event.preventDefault();
+    try { await request('ui/open-link',{url:el('tokenLink').href}); }
+    catch { el('status').textContent = 'Open id.getharvest.com/developers to create a personal access token.'; }
+  };
 } catch { el('current').textContent = 'Open Harvest Live from Codex desktop.'; }
 </script></body></html>
