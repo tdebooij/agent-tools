@@ -3,7 +3,7 @@ import { createInterface } from 'node:readline';
 
 import { days, readSchedule, saveSchedule } from './schedule.mjs';
 
-const uri = 'ui://harvest-live/timer-v1.html';
+const uri = 'ui://harvest-live/timer-v2.html';
 const mimeType = 'text/html;profile=mcp-app';
 const id = { type: 'integer', minimum: 1 };
 const label = { type: 'string', maxLength: 1000 };
@@ -53,15 +53,15 @@ function dispatch(method, params = {}) {
   switch (method) {
     case 'initialize': return {
       protocolVersion: ['2024-11-05','2025-03-26','2025-06-18','2025-11-25'].includes(params.protocolVersion) ? params.protocolVersion : '2025-11-25',
-      capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'harvest-live', version: '0.1.0' }
+      capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'harvest-live', version: '0.1.1' }
     };
     case 'ping': return {};
     case 'tools/list': return { tools: [tool, settings, save] };
     case 'resources/templates/list': return { resourceTemplates: [] };
     case 'resources/list': return { resources: [resource] };
     case 'resources/read':
-      if (params.uri !== uri) break;
-      return { contents: [{ ...resource, text: readFileSync(new URL('./timer.html', import.meta.url), 'utf8') }] };
+      if (params.uri !== uri && params.uri !== 'ui://harvest-live/timer-v1.html') break;
+      return { contents: [{ ...resource, uri: params.uri, text: readFileSync(new URL('./timer.html', import.meta.url), 'utf8') }] };
     case 'tools/call':
       if (params.name === settings.name) {
         let schedule;

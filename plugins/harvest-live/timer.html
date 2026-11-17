@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Harvest Live</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Harvest Live</title>
 <style>
 :root{color-scheme:light dark;--surface:#fffdf9;--ink:#29261f;--muted:#635d54;--line:#d2cabd;--wash:#f4f0e8;--accent:#9b3d13;--on:#fff;--live:#317247;font:16px/1.45 "Inter",system-ui,sans-serif}
-@media(prefers-color-scheme:dark){:root{--surface:#201e1b;--ink:#f6efe4;--muted:#c4baad;--line:#5d564b;--wash:#302c26;--accent:#ffac80;--on:#32150a;--live:#9ed5a7}}
+
 *{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--surface)}main{max-width:48rem;margin:auto;padding:clamp(16px,4vw,28px)}
 header,.actions,.snapshot,.brand{display:flex;align-items:center;gap:12px}header,.snapshot{justify-content:space-between}
 .brand{gap:10px}h1{font-size:1.24rem;letter-spacing:-.035em;margin:0}.mark{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;color:var(--on);background:var(--accent)}
@@ -13,7 +13,29 @@ button{cursor:pointer;font:600 .92rem system-ui;color:var(--ink);background:tran
 .actions{justify-content:flex-end;flex-wrap:wrap;margin-top:18px}.subtle{font-size:.87rem;margin:8px 0 0}.subtle:empty{display:none}#status{margin-bottom:0}fieldset{border:0;margin:0;padding:0;min-width:0}legend{position:absolute;clip-path:inset(50%)}[hidden]{display:none!important}
 @media(max-width:440px){.fields{grid-template-columns:1fr}.actions button{flex:1}.snapshot{align-items:flex-start}.elapsed{font-size:.82rem}}
 details{border-top:1px solid var(--line);margin-top:16px;padding-top:6px}summary{cursor:pointer;font-size:.88rem;color:var(--muted);padding:10px 0}.schedule{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}@media(max-width:440px){.schedule{grid-template-columns:1fr 1fr}.schedule>div:first-child{grid-column:1/-1}}
-</style></head><body><main>
+</style>
+<style id="dark-palette" media="(prefers-color-scheme: dark)">
+:root{--surface:#201e1b;--ink:#f6efe4;--muted:#c4baad;--line:#81786b;--wash:#302c26;--accent:#ffac80;--on:#32150a;--live:#9ed5a7}
+</style>
+<script>
+const themeKey = 'harvest-live.appearance';
+let chosenTheme = 'auto';
+let hostTheme;
+const isTheme = value => value === 'light' || value === 'dark';
+function applyTheme() {
+  const scheme = isTheme(chosenTheme) ? chosenTheme : hostTheme;
+  const supported = scheme || 'light dark';
+  document.documentElement.style.colorScheme = supported;
+  document.querySelector('meta[name="color-scheme"]').content = supported;
+  document.getElementById('dark-palette').media =
+    scheme === 'dark' ? 'all' : scheme === 'light' ? 'not all' : '(prefers-color-scheme: dark)';
+}
+try {
+  const saved = localStorage.getItem(themeKey);
+  if (isTheme(saved)) chosenTheme = saved;
+} catch { /* Embedded views can have storage disabled. */ }
+applyTheme();
+</script></head><body><main>
 <header><div class="brand"><span class="mark" aria-hidden="true"><span class="clock"></span></span><h1>Harvest Live</h1></div><button id="refresh" type="button" hidden>Refresh</button></header>
 <div class="snapshot"><div><small id="state">Timer</small><strong id="current">Loading Harvest…</strong><small id="currentNotes"></small></div><span id="elapsed" class="elapsed" title="Time since this timer segment started"></span></div>
 <form id="form" hidden><fieldset id="fields"><legend>New time entry</legend><div class="fields">
@@ -25,9 +47,32 @@ details{border-top:1px solid var(--line);margin-top:16px;padding-top:6px}summary
 <div><label for="start">Start</label><input id="start" type="time" required></div>
 <div><label for="end">End (24-hour)</label><input id="end" type="text" maxlength="5" placeholder="18:00" required></div></div>
 <div class="actions"><button type="submit">Save hours</button></div></form></details>
+<details><summary>Appearance</summary><label for="appearance">Theme</label>
+<select id="appearance"><option value="auto">Follow Codex</option><option value="light">Light</option><option value="dark">Dark</option></select></details>
 <p class="subtle" id="status" role="status"></p>
 </main><script type="module">
 const el = id => document.getElementById(id);
+const appearance = el('appearance');
+appearance.value = chosenTheme;
+appearance.onchange = () => {
+  chosenTheme = appearance.value;
+  applyTheme();
+  try {
+    if (chosenTheme === 'auto') localStorage.removeItem(themeKey);
+    else localStorage.setItem(themeKey, chosenTheme);
+  } catch { /* The choice still applies to this view. */ }
+};
+window.addEventListener('storage', event => {
+  if (event.key !== themeKey && event.key !== null) return;
+  chosenTheme = isTheme(event.newValue) ? event.newValue : 'auto';
+  appearance.value = chosenTheme;
+  applyTheme();
+});
+function updateHostTheme(context) {
+  if (!isTheme(context?.theme)) return;
+  hostTheme = context.theme;
+  applyTheme();
+}
 const project = el('project'), task = el('task'), notes = el('notes');
 let data, finished = false, dirty = false, sequence = 0;
 const pending = new Map();
@@ -135,12 +180,14 @@ window.addEventListener('message', e => {
   if (e.source !== parent || (hostOrigin && hostOrigin !== 'null' && e.origin !== hostOrigin) || e.data?.jsonrpc !== '2.0') return;
   const msg = e.data;
   if (pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
+  else if (msg.method === 'ui/notifications/host-context-changed') updateHostTheme(msg.params);
   else if (msg.method === 'ui/notifications/tool-result') render(msg.params.structuredContent,msg.params._meta?.schedule);
   else if (msg.method === 'ui/resource-teardown') post({id:msg.id,result:{}});
 });
 setInterval(drawTime,30000);
 try {
-  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.1.0'},appCapabilities:{},protocolVersion:'2026-01-26'});
+  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.1.1'},appCapabilities:{},protocolVersion:'2026-01-26'});
+  updateHostTheme(host.hostContext);
   post({method:'ui/notifications/initialized',params:{}});
   new ResizeObserver(() => post({method:'ui/notifications/size-changed',params:{height:Math.ceil(document.body.getBoundingClientRect().height)}})).observe(document.body);
   if (!host.hostCapabilities?.message?.text) { finished = true; el('current').textContent = 'Open the timer in a desktop chat that supports messages.'; }

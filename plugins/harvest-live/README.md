@@ -15,6 +15,8 @@ codex plugin add harvest-live@agent-tools
 
 Review and trust the installed prompt hook in Codex if prompted. Open a **new desktop chat** with a normal work request. The hook asks Codex to display the card on the first substantive prompt during working hours. Include the standalone flag `--no-harvest` in that opening prompt to skip it for that chat. You can also ask “Open Harvest Live” or “Refresh Harvest Live” at any time. A personal Harvest hook should use this card when available and reserve its old question for fallback.
 
+The timer and working-hours views follow the Codex theme. Open **Appearance → Theme** to choose **Dark**, **Light**, or **Follow Codex**. The card remembers your choice when the host allows local storage.
+
 ## Working hours
 
 The default is Monday to Friday, 09:00 inclusive to 18:00 exclusive, in the local machine timezone. Expand **Working hours** in the card, or ask “Open Harvest Live working hours”. Choose weekdays, Monday to Saturday, every day, or never. The end may be 24:00. Settings are saved for this user in `$XDG_CONFIG_HOME/harvest-live/schedule.json` (normally `~/.config/harvest-live/schedule.json`). Opening a chat outside the schedule skips the automatic timer check for that chat.

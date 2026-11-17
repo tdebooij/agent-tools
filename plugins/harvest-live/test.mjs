@@ -13,7 +13,7 @@ function run(script, lines) {
 test('discover and read the card, reject an unknown timer, round-trip a running proposal', () => {
   const draft = {running:{id:19,project:'Website',task:'Design',started_at:'2026-11-17T12:00:00Z'},projects:[{id:2,client:'Studio',name:'Website',tasks:[{id:3,name:'Design'}]}],notes:'Review checkout',project_id:2,task_id:3};
   const call = args => ({name:'show_timer',arguments:args});
-  const uri = 'ui://harvest-live/timer-v1.html';
+  const uri = 'ui://harvest-live/timer-v2.html';
   const messages = [['initialize',{protocolVersion:'2025-11-25'}],['tools/list'],['resources/read',{uri}],['tools/call',call(draft)],['tools/call',call({...draft,running:undefined})],['tools/call',call({...draft,project_id:-1})],['tools/call',call({...draft,running:null})]];
   const [init,list,read,show,unknown,bad,idle] = run('server.mjs',messages.map(([method,params],id)=>({jsonrpc:'2.0',id,method,params})));
   assert.equal(init.result.protocolVersion,'2025-11-25');

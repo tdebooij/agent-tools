@@ -1,6 +1,6 @@
 {
   "name": "harvest-live",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Review and confirm a Harvest time entry in Codex using your connected Harvest tools.",
   "author": {
     "name": "Tim de Booij"
