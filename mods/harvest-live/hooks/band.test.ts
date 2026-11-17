@@ -141,3 +141,35 @@ test('project and task show as text until Change is pressed', CONNECTED, async (
   await ui.unmount()
 })
 
+
+test('Switch stops a running timer and starts the new one', CONNECTED, async ($, on) => {
+  const clock = mock.clock(on)
+  mock.store(on)
+  on('ui.render', ($, e) => h($.ui.resolve(e).Box, {}) as never)
+  const calls: string[] = []
+  const running = { id: 99, is_running: true, timer_started_at: '2026-11-16T08:00:00Z', project: { name: 'Website' }, task: { name: 'Development' }, notes: '' }
+  on('http.fetch', (_$: unknown, e: { url: string; init?: { method?: string } }) => {
+    const path = e.url.replace('https://api.harvestapp.com/v2', '')
+    const method = e.init?.method ?? 'GET'
+    calls.push(`${method} ${path.split('?')[0]}`)
+    const body =
+      path.startsWith('/users/me/project_assignments')
+        ? { project_assignments: [{ project: { id: 1, name: 'Website' }, client: { name: 'Example Client' }, task_assignments: [{ task: { id: 7, name: 'Development' } }] }] }
+        : path.startsWith('/users/me')
+          ? { id: 42 }
+          : path.startsWith('/time_entries?')
+            ? { time_entries: [running] }
+            : method === 'PATCH'
+              ? { ...running, is_running: false }
+              : { ...running, id: 100 }
+    return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify(body) } } as never
+  })
+  await $.command.run({ command: 'harvest', args: '' } as never)
+  await clock.advance(1000)
+  const ui = await $.ui.mount({ plugin: 'harvest-live', surface: 'desktop', ...BAND })
+  await ui.press({ key: 'start' })
+  expect(calls).toContain('PATCH /time_entries/99/stop')
+  expect(calls).toContain('POST /time_entries')
+  expect(await ui.find({ type: 'Text', text: /Harvest error/ })).toBeUndefined()
+  await ui.unmount()
+})

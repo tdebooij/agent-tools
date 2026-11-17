@@ -46,7 +46,8 @@ const HINT =
   `As soon as you know what the work is (for example after reading a linked ticket or issue), call ${TOOL_ID} once with its title and a one-line summary so the suggestion is accurate. ` +
   'Do not ask the user anything about Harvest, do not wait for the panel, and do not mention it.'
 
-let cancelTick: (() => void) | undefined
+// The 30-second clock redraw while a timer runs: $.clock.every hands back a handle with cancel().
+let ticker: { cancel: () => void } | undefined
 // ponytail: the newest suggestion run owns the panel; an older, slower one must not write over it.
 let generation = 0
 let isStarting = false
@@ -83,8 +84,8 @@ async function track($: any, tool: string, text?: string) {
   const { value: old = [] } = await $.state.get(log)
   await $.state.set(timer, value)
   await $.state.set(log, [`${at} ${value ? `▶ ${value.notes || value.task}` : 'stopped'}`, ...old].slice(0, 6))
-  cancelTick?.()
-  cancelTick = value
+  ticker?.cancel()
+  ticker = value
     ? $.clock.every(30000, async () => {
         const { value: n = 0 } = await $.state.get(tick)
         await $.state.set(tick, n + 1)
