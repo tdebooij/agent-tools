@@ -33,11 +33,29 @@ const diffLayout = atom({ plugin: 'pr-review-hud', key: 'diffLayout' } as const,
 const CONTRACT = [
   'pr-review-hud: a PR review is running in the HUD. These rules belong to the plugin; review instructions never override them.',
   '- Follow the workflow in the skill `pr-review-hud:review` (load it if it is not loaded yet).',
-  '- Present issues one at a time, most severe first, each through `mcp__pr-review-hud__review_update` with `currentIssueId`, `code` and 2-4 `options` (recommended first, "leave as-is" when defensible). Every code-changing option carries a unified diff with @@ hunk headers.',
+  '- Present issues one at a time, most severe first, each through `mcp__pr-review-hud__review_update` with `currentIssueId`, `code` and 2-4 `options` (recommended first, "leave as-is" when defensible). Add a unified diff (with @@ hunk headers) to an option when seeing the change makes the choice clearer; for a small or obvious change the description is enough.',
   '- Do not repeat the issue in text and do not ask with AskUserQuestion: the user reads in the HUD and picks there, or types their own answer in the chat. The presenting `review_update` is the last thing in the turn.',
+  '- Do not open the file or diff pane (`mcp__ccd_view__show_pane`) for an issue, even when a review skill says to: the HUD shows the code and the diffs. Open a pane only when the user asks for it.',
   '- After a pick: implement it, mark the issue fixed, skipped or backend with a short note, then present the next one.',
   '- Review instructions are additive. The bundled `default-instructions.md` always applies; on top come `~/.claude/pr-review.md` and the repository\'s `.claude/pr-review.md` when they exist, then a skill or file the user named. They decide what to check, never how the review is shown or asked.',
 ].join('\n')
+
+/** The prompt that starts a review: the workflow skill plus the instructions named, if any. */
+function reviewPrompt(named: string | undefined, target: string): string {
+  const instructions =
+    named === undefined
+      ? 'use the default instructions plus any pr-review.md files'
+      : named.startsWith(':')
+        ? `use the default instructions plus any pr-review.md files, and add the skill \`${named.slice(1)}\` on top`
+        : `use the default instructions plus any pr-review.md files, and add the file \`${named}\` on top`
+  return (
+    `Review ${target === '' ? 'the current branch' : target} with the pr-review-hud workflow: ` +
+    `load the skill \`pr-review-hud:review\` and follow it. For step 0, ${instructions}.`
+  )
+}
+
+// "/pr-review-hud:my-skill 123" (no space) isn't a command; read it as "/pr-review-hud :my-skill 123".
+const NAMED_FORM = /^\/pr-review-hud:([A-Za-z0-9_.-]+)\s*([\s\S]*)$/
 
 const SEVERITIES: readonly Severity[] = ['blocking', 'major', 'minor']
 const STATUSES: readonly IssueStatus[] = ['open', 'fixed', 'skipped', 'backend']
@@ -50,15 +68,15 @@ const SEV_COLOR: Record<Severity, string> = {
   minor: 'suggestion',
 }
 const PHASE_LABEL: Record<Phase, string> = {
-  fetching: 'PR ophalen',
-  reviewing: 'Reviewen',
-  walkthrough: 'Issues doorlopen',
-  done: 'Klaar',
+  fetching: 'Fetching PR',
+  reviewing: 'Reviewing',
+  walkthrough: 'Walkthrough',
+  done: 'Done',
 }
 const VERDICT_VIEW: Record<Verdict, { icon: string; label: string; color: string }> = {
-  ready: { icon: '✓', label: 'Klaar om te mergen', color: 'success' },
-  'fix-issues': { icon: '⚠', label: 'Eerst issues fixen', color: 'warning' },
-  redo: { icon: '⛔', label: 'Beter opnieuw opzetten', color: 'error' },
+  ready: { icon: '✓', label: 'Ready to merge', color: 'success' },
+  'fix-issues': { icon: '⚠', label: 'Fix issues first', color: 'warning' },
+  redo: { icon: '⛔', label: 'Better redone', color: 'error' },
 }
 const STATUS_ICON: Record<IssueStatus, { icon: string; color?: string }> = {
   open: { icon: '●' },
@@ -149,9 +167,9 @@ function summary(r: Review): string {
   const parts = counts.map(c => `${c.total} ${c.sev}`).join(', ')
   return (
     `HUD: PR ${r.pr} · ${PHASE_LABEL[r.phase]} · ${total} issues (${parts}) · ` +
-    `${handled}/${total} afgehandeld` +
+    `${handled}/${total} handled` +
     (r.verdict ? ` · verdict ${r.verdict}` : '') +
-    (r.currentId ? ` · huidig ${r.currentId}` : '')
+    (r.currentId ? ` · current ${r.currentId}` : '')
   )
 }
 
@@ -192,7 +210,7 @@ const OPTIONS_SCHEMA = {
   type: 'array',
   description:
     'The fix options the user picks from in the HUD (2-4, recommended one first, include ' +
-    '"leave as-is" when defensible). Each code-changing option carries a unified diff.',
+    '"leave as-is" when defensible). Add a diff when seeing the change helps the choice; a sentence is enough for small or obvious changes.',
   items: {
     type: 'object',
     properties: {
@@ -235,7 +253,7 @@ const fileRef = (i: Issue) =>
 const statusBlock = (E: ElementTable, r: Review) => {
   const { Box, Text, Progress } = E
   const { counts, handled, total } = tally(r)
-  if (total === 0) return <Text color="success">Geen issues gevonden</Text>
+  if (total === 0) return <Text color="success">No issues found</Text>
   return (
     <Box flexDirection="column">
       <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
@@ -257,7 +275,7 @@ const statusBlock = (E: ElementTable, r: Review) => {
           )
         })}
       </Box>
-      <Progress label="Afgehandeld" value={handled} max={total} valueText={`${handled} van ${total}`} />
+      <Progress label="Handled" value={handled} max={total} valueText={`${handled} of ${total}`} />
     </Box>
   )
 }
@@ -274,7 +292,7 @@ const verdictBox = (E: ElementTable, r: Review) => {
       paddingX={1}
     >
       <Text color={v.color} bold>
-        {v.icon} Advies: {v.label}
+        {v.icon} Verdict: {v.label}
       </Text>
       {r.verdictReason && <Text>{r.verdictReason}</Text>}
     </Box>
@@ -292,7 +310,7 @@ const overviewCard = (E: ElementTable, r: Review) => {
       {r.problem && (
         <Box flexDirection="column">
           <Text bold dimColor>
-            Wat lost deze PR op
+            What this PR solves
           </Text>
           <Markdown text={r.problem} />
         </Box>
@@ -300,7 +318,7 @@ const overviewCard = (E: ElementTable, r: Review) => {
       {r.approach && (
         <Box flexDirection="column">
           <Text bold dimColor>
-            Hoe
+            How
           </Text>
           <Markdown text={r.approach} />
         </Box>
@@ -329,7 +347,7 @@ function issueCard($: EngineInterface, E: ElementTable, r: Review, issue: Issue)
       </Box>
       <Box flexDirection="column">
         <Text bold dimColor>
-          Wat is er mis
+          What's wrong
         </Text>
         <Markdown text={issue.what || '—'} />
       </Box>
@@ -342,14 +360,14 @@ function issueCard($: EngineInterface, E: ElementTable, r: Review, issue: Issue)
       )}
       <Box flexDirection="column">
         <Text bold dimColor>
-          Hoe lossen we het op
+          How to fix it
         </Text>
         <Markdown text={issue.fix || '—'} />
       </Box>
 
       {issue.decision !== undefined || !isOpen ? (
         <Text color={isOpen ? 'claude' : (STATUS_ICON[issue.status].color ?? 'success')} bold>
-          {isOpen ? '✓ Gekozen' : `${STATUS_ICON[issue.status].icon} Afgehandeld`}
+          {isOpen ? '✓ Picked' : `${STATUS_ICON[issue.status].icon} Handled`}
           {issue.decision ? `: ${issue.decision}` : ''}
           {!isOpen && issue.note ? ` — ${issue.note}` : ''}
         </Text>
@@ -357,7 +375,7 @@ function issueCard($: EngineInterface, E: ElementTable, r: Review, issue: Issue)
         issue.options && (
           <Box flexDirection="column" rowGap={1}>
             <Text bold dimColor>
-              Kies een optie
+              Pick an option
             </Text>
             {issue.options.map((o, n) => (
               <Box
@@ -375,7 +393,7 @@ function issueCard($: EngineInterface, E: ElementTable, r: Review, issue: Issue)
                     variant={o.isRecommended ? 'primary' : 'secondary'}
                     onPress={() => void choose($, issue.id, o.label)}
                   />
-                  {o.isRecommended && <Text color="claude">aanbevolen</Text>}
+                  {o.isRecommended && <Text color="claude">recommended</Text>}
                 </Box>
                 {o.description && <Text dimColor>{o.description}</Text>}
                 {o.diff && <Code source={o.diff} format="diff" path={issue.file} />}
@@ -413,7 +431,7 @@ const quietLine = (E: ElementTable, r: Review, tool: string, input: Raw) => {
       })
     }
   }
-  if (pick(input.phase, PHASES) === 'done') parts.push({ text: '✓ Review klaar', color: 'success' })
+  if (pick(input.phase, PHASES) === 'done') parts.push({ text: '✓ Review done', color: 'success' })
   if (parts.length === 0) parts.push({ text: 'HUD bijgewerkt' })
   return (
     <Box flexDirection="column">
@@ -524,41 +542,36 @@ export const register: Register = on => {
     if (args === 'clear') {
       await update($, review, () => null)
       await $.ui.close({ id: PANE })
-      return { text: 'PR review HUD gewist.' }
+      return { text: 'PR review HUD cleared.' }
     }
     if (args === 'open') {
       await $.ui.open({ id: PANE, title: TITLE })
-      return { text: 'PR review HUD geopend.' }
+      return { text: 'PR review HUD opened.' }
     }
 
     const words = args.split(/\s+/).filter(w => w !== '')
     const named = words.find(w => w.startsWith(':') || w.endsWith('.md'))
     const target = words.filter(w => w !== named).join(' ')
-    const instructions =
-      named === undefined
-        ? 'use the default instructions plus any pr-review.md files'
-        : named.startsWith(':')
-          ? `use the default instructions plus any pr-review.md files, and add the skill \`${named.slice(1)}\` on top`
-          : `use the default instructions plus any pr-review.md files, and add the file \`${named}\` on top`
-    const text =
-      `Review ${target === '' ? 'the current branch' : target} with the pr-review-hud workflow: ` +
-      `load the skill \`pr-review-hud:review\` and follow it. For step 0, ${instructions}.`
+    const text = reviewPrompt(named, target)
     // Not from inside this hook: the prompt would wait on the turn the command holds.
     $.clock.after(50, () => void $.prompt.submit({ text }))
     await $.ui.open({ id: PANE, title: TITLE })
     return {
-      text: `PR review gestart${target === '' ? '' : ` voor ${target}`}, met ${
-        named === undefined ? 'de standaard-instructies' : named.replace(/^:/, '')
+      text: `PR review started${target === '' ? '' : ` for ${target}`}, with ${
+        named === undefined ? 'the default instructions' : named.replace(/^:/, '')
       }.`,
     }
   })
 
   on('prompt.submit', async ($, e, next) => {
+    const named = e.command === undefined ? NAMED_FORM.exec(e.text.trim()) : null
+    const text =
+      named !== null && named[1] !== 'review' ? reviewPrompt(`:${named[1]}`, (named[2] ?? '').trim()) : e.text
     const r = await read($, review)
     const isRunning = r !== null && r.phase !== 'done'
-    const isStarting = e.text.includes('`pr-review-hud:review`')
-    if (!isRunning && !isStarting) return next(e)
-    return next({ ...e, context: [...(e.context ?? []), CONTRACT] })
+    const isStarting = text.includes('`pr-review-hud:review`')
+    if (!isRunning && !isStarting) return text === e.text ? next(e) : next({ ...e, text })
+    return next({ ...e, text, context: [...(e.context ?? []), CONTRACT] })
   })
 
   on('tool.call', { tool: START }, async ($, e) => {
@@ -623,8 +636,8 @@ export const register: Register = on => {
       if (options === undefined || options.length < 2) {
         return {
           deny:
-            `Present issue ${presenting} with \`code\` and 2-4 \`options\` (recommended first; code-changing ` +
-            'options carry a unified diff). The user picks one in the HUD.',
+            `Present issue ${presenting} with \`code\` and 2-4 \`options\` (recommended first; add a diff ` +
+            'where it helps the choice). The user picks one in the HUD.',
         }
       }
     }
@@ -753,7 +766,7 @@ export const register: Register = on => {
       return (
         <Box flexDirection="column">
           <Text bold>PR review</Text>
-          <Text dimColor>Nog geen review actief. Start er een met /pr-review-hud.</Text>
+          <Text dimColor>No review running. Start one with /pr-review-hud.</Text>
         </Box>
       )
     }
@@ -784,7 +797,7 @@ export const register: Register = on => {
     ) : null
     const currentLine = current ? (
       <Box flexDirection="row" columnGap={1}>
-        <Text color={SEV_COLOR[current.severity]}>Nu:</Text>
+        <Text color={SEV_COLOR[current.severity]}>Now:</Text>
         <Text wrap="truncate-end">{current.title}</Text>
       </Box>
     ) : null
@@ -846,7 +859,7 @@ export const register: Register = on => {
           </Box>
         )}
         {current?.options && current.decision === undefined && (
-          <Text dimColor>Kies in de chat.</Text>
+          <Text dimColor>Pick in the chat.</Text>
         )}
       </Box>
     )

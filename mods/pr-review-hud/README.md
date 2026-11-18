@@ -12,7 +12,7 @@ Pick a fix in the bar above the prompt, or type your own answer in the chat:
 
 - **Explains the PR**: what problem it addresses and how it solves it.
 - **Gives a verdict**: ready to merge, fix the issues first, or better redone from scratch.
-- **Goes one issue at a time**, blocking → major → minor. Each issue says what's wrong, shows the code, explains how to fix it, and offers 2-4 fix options, each code-changing one with its diff.
+- **Goes one issue at a time**, blocking → major → minor. Each issue says what's wrong, shows the code, explains how to fix it, and offers 2-4 fix options, with a diff where seeing the change helps.
 - **You pick, Claude implements**: click an option, or type your own answer in the chat. Claude makes the change and moves to the next issue.
 
 On the Claude desktop app you read the issue in the side pane, with side-by-side diffs (or stacked, one click away), and pick in a bar above the prompt. The chat keeps one line per issue as history. On the terminal the issue is a card in the chat.

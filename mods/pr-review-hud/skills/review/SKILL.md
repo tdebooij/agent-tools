@@ -76,7 +76,7 @@ Write the issue texts in the user's language.
 
 What `review_update` draws (side pane plus bar on desktop, a chat card on the terminal) is the one place for the issue. Don't repeat it in text, don't use AskUserQuestion for issue options, and don't open the file or diff pane for it unless the user asks.
 
-1. Call `review_update` with `currentIssueId`, `code` (the 5-20 lines in question as they stand in the PR, with `path` and `startLine`) and `options`. The recommended option goes first with `isRecommended: true`. Every code-changing option gets a `diff`: a unified diff with `---`/`+++` and `@@ -a,b +c,d @@` hunk headers. Keep `what` and `fix` current (re-send the issue through `review_start` if your understanding changed).
+1. Call `review_update` with `currentIssueId`, `code` (the 5-20 lines in question as they stand in the PR, with `path` and `startLine`) and `options`. The recommended option goes first with `isRecommended: true`. Give an option a `diff` (a unified diff with `---`/`+++` and `@@ -a,b +c,d @@` hunk headers) when seeing the change makes the choice clearer. For a small or obvious change, a clear description is enough. Keep `what` and `fix` current (re-send the issue through `review_start` if your understanding changed).
 2. Make that `review_update` call the **last thing in your turn**: no text after it. Anything you must say goes before the call, in one line at most.
 3. The user's pick arrives as their next message, `Issue <id>: <label>`, or as their own words typed in the chat. Implement it.
 
@@ -84,7 +84,7 @@ What `review_update` draws (side pane plus bar on desktop, a chat card on the te
 
 Show the code before asking. When `mcp__ccd_view__show_pane` is available, open `pane: "diff"` with `path` for changed lines, or `pane: "file"` with `path` and `line` for surrounding code. Otherwise give `file:line` links and a short fenced snippet.
 
-Ask with AskUserQuestion where available. Give each code-changing option a `preview` with the change as a small unified diff in a fenced code block tagged `diff`. Don't move on, or start implementing, until the user answers.
+Ask with AskUserQuestion where available. Where seeing the change helps, give an option a `preview` with a small unified diff in a fenced code block tagged `diff`. Don't move on, or start implementing, until the user answers.
 
 ### After each pick
 

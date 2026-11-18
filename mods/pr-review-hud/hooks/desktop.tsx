@@ -1,6 +1,6 @@
 // Desktop-only drawing: SVG graphics in Claude's palette and a side-by-side diff.
 // Everything here is pure: it takes the desktop element table and plain data.
-// Only fixed strings and numbers go into SVG markup, never PR content.
+// Only fixed strings, numbers and escaped issue titles (tooltips) go into SVG markup.
 
 import type { Elements } from 'claude-code'
 
@@ -37,10 +37,10 @@ const svg = (w: number, h: number, body: string): Pic => ({
 // ---------- graphics ----------
 
 const PHASE_LABEL: Record<Phase, string> = {
-  fetching: 'PR ophalen',
-  reviewing: 'Reviewen',
-  walkthrough: 'Issues doorlopen',
-  done: 'Klaar',
+  fetching: 'Fetching PR',
+  reviewing: 'Reviewing',
+  walkthrough: 'Walkthrough',
+  done: 'Done',
 }
 const PHASES: readonly Phase[] = ['fetching', 'reviewing', 'walkthrough', 'done']
 
@@ -72,17 +72,17 @@ export function stepperSvg(phase: Phase): Pic {
 
 const VERDICT: Record<Verdict, { label: string; fill: string; icon: string }> = {
   ready: {
-    label: 'Klaar om te mergen',
+    label: 'Ready to merge',
     fill: '#5E8B57',
     icon: '<path d="M 15 24 l 5 5 l 10 -11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
   },
   'fix-issues': {
-    label: 'Eerst issues fixen',
+    label: 'Fix issues first',
     fill: '#B9792A',
     icon: '<path d="M 22 13 L 32 31 L 12 31 Z" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><line x1="22" y1="19.5" x2="22" y2="25" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="22" cy="28.2" r="1.4" fill="#fff"/>',
   },
   redo: {
-    label: 'Beter opnieuw opzetten',
+    label: 'Better redone',
     fill: '#B0473A',
     icon: '<path d="M 30.5 17.5 A 9.5 9.5 0 1 0 31.5 26" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M 31.5 11.5 L 31.5 18.5 L 24.5 18.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
   },
@@ -97,13 +97,13 @@ export function verdictSvg(verdict: Verdict): Pic {
     40,
     `<rect x="1" y="1" width="638" height="38" rx="9" fill="${v.fill}" fill-opacity="0.12" stroke="${v.fill}" stroke-opacity="0.35"/>` +
       `<g transform="translate(0 -2)">${icon}</g>` +
-      `<text x="44" y="25" style="font-family:${FONT};font-size:14px;font-weight:600;fill:${v.fill}">Advies: ${v.label}</text>`,
+      `<text x="44" y="25" style="font-family:${FONT};font-size:14px;font-weight:600;fill:${v.fill}">Verdict: ${v.label}</text>`,
   )
 }
 
-/** A small filled chip: severity, or "aanbevolen". */
+/** A small filled chip: severity, or "recommended". */
 export function chipSvg(text: string, fill: string): Pic {
-  const w = Math.round(text.length * 7.2 + 18)
+  const w = Math.round(text.length * 7.2 + 30)
   return svg(
     w,
     20,
@@ -153,6 +153,29 @@ function phaseDot(state: 'done' | 'now' | 'todo'): Pic {
         ? `<circle cx="6" cy="6" r="5" fill="none" stroke="${C.claude}" stroke-width="1.5"/><circle cx="6" cy="6" r="2.4" fill="${C.claude}"/>`
         : `<circle cx="6" cy="6" r="4.5" fill="none" stroke="${C.skipped}" stroke-width="1.2"/>`
   return svg(12, 12, body)
+}
+
+const esc = (t: string) =>
+  t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/** One numbered dot per issue: green done, grey skipped, violet to backend, clay now, outlined open. */
+export function numberChip(n: number, issue: Issue, isNow: boolean): Pic {
+  const d = 20
+  const [fill, stroke, text] = isNow
+    ? [C.claude, 'none', '#fff']
+    : issue.status === 'fixed'
+      ? [C.fixed, 'none', C.fixed]
+      : issue.status === 'skipped'
+        ? [C.skipped, 'none', C.skipped]
+        : issue.status === 'backend'
+          ? [C.backend, 'none', C.backend]
+          : ['none', SEV[issue.severity], SEV[issue.severity]]
+  const isTint = !isNow && issue.status !== 'open'
+  const body =
+    `<title>${n} · ${esc(issue.title)}</title>` +
+    `<circle cx="10" cy="10" r="${stroke === 'none' ? 9.5 : 8.8}" fill="${fill}"${isTint ? ' fill-opacity="0.2"' : ''} stroke="${stroke}" stroke-width="1.4"${stroke === 'none' ? '' : ' stroke-opacity="0.7"'}/>` +
+    `<text x="10" y="13.8" text-anchor="middle" style="font-family:${FONT};font-size:10.5px;font-weight:600;fill:${text}">${n}</text>`
+  return svg(d, d, body)
 }
 
 /** Thin bar, one rounded segment per issue in its status colour. */
@@ -205,15 +228,28 @@ export function progressRow(D: Desk, r: Review) {
   const handled = r.issues.filter(i => i.status !== 'open').length
   return (
     <Box flexDirection="row" columnGap={1} alignItems="center">
-      <Svg {...segBar(r)} alt={`${handled} van ${r.issues.length} afgehandeld`} />
+      <Svg {...segBar(r)} alt={`${handled} of ${r.issues.length} handled`} />
       <Text size="caption" dimColor>
-        {handled} van {r.issues.length} afgehandeld
+        {handled} of {r.issues.length} handled
       </Text>
     </Box>
   )
 }
 
-export const RECOMMENDED = chipSvg('AANBEVOLEN', C.claude)
+export const RECOMMENDED = chipSvg('RECOMMENDED', C.claude)
+
+/** An option's number in the margin: filled for the recommended one, outlined for the rest. */
+export function optionNumber(n: number, isRecommended: boolean): Pic {
+  const body = isRecommended
+    ? `<circle cx="11" cy="11" r="10.5" fill="${C.claude}"/>` +
+      `<text x="11" y="15" text-anchor="middle" style="font-family:${FONT};font-size:11.5px;font-weight:600;fill:#fff">${n}</text>`
+    : `<circle cx="11" cy="11" r="10" fill="none" stroke="${C.skipped}" stroke-width="1.2"/>` +
+      `<text x="11" y="15" text-anchor="middle" class="t b" style="font-size:11.5px">${n}</text>`
+  return svg(22, 22, body)
+}
+
+/** A hairline between options, wider than any pane and clipped by its box. */
+export const DIVIDER = svg(2400, 1, `<rect x="0" y="0" width="2400" height="1" fill="${C.track}"/>`)
 
 // ---------- side-by-side diff ----------
 
@@ -327,12 +363,14 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
     </Box>
   )
 
-  const separator = (
+  const barred = (row: ReturnType<typeof line>) => row
+
+  const separator = barred(
     <Box paddingX={1}>
       <Text mono size="caption" dimColor>
         ⋯
       </Text>
-    </Box>
+    </Box>,
   )
 
   const fileBlock = (f: DiffFile) => {
@@ -343,8 +381,8 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
     let dels: Side[] = []
     let adds: Side[] = []
     const flush = () => {
-      for (const d of dels) out.push(line(d, n, num(d.n)))
-      for (const a of adds) out.push(line(a, n, num(a.n)))
+      for (const d of dels) out.push(barred(line(d, n, num(d.n))))
+      for (const a of adds) out.push(barred(line(a, n, num(a.n))))
       dels = []
       adds = []
     }
@@ -357,20 +395,22 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
       }
       if (layout === 'split') {
         out.push(
-          <Box flexDirection="row">
-            <Box width="50%" flexDirection="row">
-              {line(row.left, n, num(row.left?.n))}
-            </Box>
-            <Box width="50%" flexDirection="row">
-              {line(row.right, n, num(row.right?.n))}
-            </Box>
-          </Box>,
+          barred(
+            <Box flexDirection="row" flexGrow={1}>
+              <Box width="50%" flexDirection="row">
+                {line(row.left, n, num(row.left?.n))}
+              </Box>
+              <Box width="50%" flexDirection="row">
+                {line(row.right, n, num(row.right?.n))}
+              </Box>
+            </Box>,
+          ),
         )
         continue
       }
       if (row.left?.kind === 'ctx') {
         flush()
-        out.push(line(row.right, n, num(row.right?.n)))
+        out.push(barred(line(row.right, n, num(row.right?.n))))
         continue
       }
       if (row.left) dels.push(row.left)
@@ -380,11 +420,14 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
     return out
   }
 
+  // A quote: a slim bar down the left of the diff, drawn as a filled Box so every surface shows it.
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="subtle">
+    // A quote: the whole diff on one soft warm-grey wash, readable in light and dark.
+    <Box flexDirection="row" marginTop="sm" paddingY="xs" backgroundColor="rgba(140,132,120,0.12)">
+      <Box flexDirection="column" flexGrow={1} flexShrink={1}>
       {files.map(f => (
         <Box flexDirection="column">
-          {(files.length > 1 || f.name !== '') && (
+          {files.length > 1 && f.name !== '' && (
             <Box paddingX={1}>
               <Text mono size="caption" dimColor>
                 {f.name}
@@ -394,6 +437,7 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
           {fileBlock(f)}
         </Box>
       ))}
+      </Box>
     </Box>
   )
 }
@@ -406,7 +450,7 @@ export function snippetView(D: Desk, source: string, startLine: number | undefin
   const cut = Number.isFinite(n) ? n : 0
   const first = startLine ?? 1
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="subtle" paddingY={1}>
+    <Box flexDirection="column">
       {lines.map((l, i) => (
         <Box flexDirection="row" columnGap={1} paddingX={1}>
           <Text mono tabular size="caption" dimColor>
@@ -424,7 +468,7 @@ export function snippetView(D: Desk, source: string, startLine: number | undefin
 }
 
 /** Short prose with `code` and **bold** spans, at a given size. */
-export function inlineText(D: Desk, text: string, size: 'caption' | 'footnote', dim = false) {
+export function inlineText(D: Desk, text: string, size: 'caption' | 'footnote' | 'body', dim = false) {
   const { Text } = D
   const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).filter(p => p !== '')
   return (
@@ -469,19 +513,19 @@ export function desktopOverview(D: Desk, r: Review) {
       {stepperRow(D, r.phase)}
       {r.problem && (
         <Box flexDirection="column">
-          <Text weight="semibold">Wat lost deze PR op</Text>
+          <Text weight="semibold">What this PR solves</Text>
           <Markdown text={r.problem} />
         </Box>
       )}
       {r.approach && (
         <Box flexDirection="column">
-          <Text weight="semibold">Hoe</Text>
+          <Text weight="semibold">How</Text>
           <Markdown text={r.approach} />
         </Box>
       )}
       {r.verdict && (
         <Box flexDirection="column">
-          <Svg {...verdictSvg(r.verdict)} alt={`Advies: ${VERDICT[r.verdict].label}`} />
+          <Svg {...verdictSvg(r.verdict)} alt={`Verdict: ${VERDICT[r.verdict].label}`} />
           {r.verdictReason && <Text dimColor>{r.verdictReason}</Text>}
         </Box>
       )}
@@ -496,7 +540,7 @@ export function desktopOverview(D: Desk, r: Review) {
           {issueList(D, r)}
         </Box>
       ) : (
-        <Text color="success">Geen issues gevonden</Text>
+        <Text color="success">No issues found</Text>
       )}
     </Box>
   )
@@ -510,8 +554,8 @@ export function desktopIssueRow(D: Desk, r: Review, issue: Issue) {
   const state = !isOpen
     ? `${statusWord(issue.status)}${issue.note ? ` — ${issue.note}` : ''}`
     : issue.decision !== undefined
-      ? `gekozen: ${issue.decision}`
-      : 'open, staat in het paneel rechts'
+      ? `picked: ${issue.decision}`
+      : 'open, in the side pane'
   return (
     <Box flexDirection="row" columnGap={1} alignItems="center" flexWrap="wrap">
       <Svg {...statusIcon(issue.status, issue.severity, isOpen && issue.decision === undefined)} alt={statusWord(issue.status)} />
@@ -535,9 +579,6 @@ function issueDetail(D: Desk, r: Review, issue: Issue, layout: DiffLayout, toggl
       <Box flexDirection="column">
         <Box flexDirection="row" columnGap={1} alignItems="center" flexWrap="wrap">
           <Svg {...sevTag(issue.severity)} alt={issue.severity} />
-          <Text size="caption" dimColor>
-            Issue {index + 1} van {r.issues.length}
-          </Text>
           {issue.file && (
             <Text mono size="caption" dimColor>
               {fileRef(issue)}
@@ -550,51 +591,61 @@ function issueDetail(D: Desk, r: Review, issue: Issue, layout: DiffLayout, toggl
       </Box>
       <Box flexDirection="column">
         <Text size="footnote" weight="semibold">
-          Wat is er mis
+          What's wrong
         </Text>
-        {inlineText(D, issue.what || '—', 'footnote')}
+        {inlineText(D, issue.what || '—', 'body')}
       </Box>
       {issue.code && snippetView(D, issue.code.source, issue.code.startLine ?? issue.line)}
       <Box flexDirection="column">
         <Text size="footnote" weight="semibold">
-          Hoe lossen we het op
+          How to fix it
         </Text>
-        {inlineText(D, issue.fix || '—', 'footnote')}
+        {inlineText(D, issue.fix || '—', 'body')}
       </Box>
       {issue.decision !== undefined ? (
         <Text size="footnote" color="claude" weight="semibold">
-          ✓ Gekozen: {issue.decision}
+          ✓ Picked: {issue.decision}
         </Text>
       ) : (
         issue.options && (
           <Box flexDirection="column" rowGap={1}>
             <Box flexDirection="row" justifyContent="space-between" alignItems="center">
               <Text size="footnote" weight="semibold">
-                Opties
+                Options
               </Text>
               {issue.options.some(o => o.diff) && (
                 <Button
                   key="layout-toggle"
-                  label={layout === 'split' ? 'Onder elkaar' : 'Naast elkaar'}
+                  label={layout === 'split' ? 'Stacked' : 'Side by side'}
                   plain
                   onPress={toggleLayout}
                 />
               )}
             </Box>
             {issue.options.map((o, n) => (
-              <Box flexDirection="column" rowGap={0}>
-                <Box flexDirection="row" columnGap={1} alignItems="center" flexWrap="wrap">
-                  <Text size="footnote" weight="semibold" color={o.isRecommended ? 'claude' : undefined}>
-                    {n + 1} · {o.label}
-                  </Text>
-                  {o.isRecommended && <Svg {...RECOMMENDED} alt="aanbevolen" />}
+              <Box flexDirection="column" rowGap={1}>
+                {n > 0 && (
+                  <Box overflow="hidden">
+                    <Svg {...DIVIDER} alt="" />
+                  </Box>
+                )}
+                <Box flexDirection="row" columnGap={1} alignItems="flex-start">
+                  <Svg {...optionNumber(n + 1, o.isRecommended === true)} alt={`Option ${n + 1}`} />
+                  <Box flexDirection="column" rowGap={0} flexGrow={1} flexShrink={1}>
+                    <Box flexDirection="row" columnGap={1} alignItems="center" flexWrap="wrap">
+                      <Text size="footnote" weight="semibold">
+                        {o.label}
+                      </Text>
+                      {o.isRecommended && <Svg {...RECOMMENDED} alt="recommended" />}
+                    </Box>
+                    {o.description && inlineText(D, o.description, 'body')}
+                    {o.diff && diffView(D, o.diff, layout)}
+                  </Box>
                 </Box>
-                {o.description && inlineText(D, o.description, 'caption', true)}
-                {o.diff && diffView(D, o.diff, layout)}
               </Box>
             ))}
             <Text size="caption" dimColor>
-              Kies onderaan bij de prompt, of typ een eigen antwoord in de chat.
+              Pick below at the prompt, or type your own answer in the chat.
             </Text>
           </Box>
         )
@@ -604,7 +655,7 @@ function issueDetail(D: Desk, r: Review, issue: Issue, layout: DiffLayout, toggl
 }
 
 const statusWord = (s: IssueStatus) =>
-  s === 'fixed' ? 'opgelost' : s === 'skipped' ? 'overgeslagen' : s === 'backend' ? 'naar backend' : 'open'
+  s === 'fixed' ? 'fixed' : s === 'skipped' ? 'skipped' : s === 'backend' ? 'to backend' : 'open'
 
 /** Every issue on one aligned row: status mark, severity tag, title, note under it. */
 function issueList(D: Desk, r: Review) {
@@ -643,7 +694,22 @@ function issueList(D: Desk, r: Review) {
   )
 }
 
-/** The side pane on desktop: status on top, then the open issue to read, then every issue. */
+/** The PR at a glance: one numbered dot per issue, hover for its title. */
+function issueChips(D: Desk, r: Review, currentId: string | undefined) {
+  const { Box, Svg } = D
+  return (
+    <Box flexDirection="row" columnGap={1} rowGap={1} flexWrap="wrap" alignItems="center">
+      {r.issues.map((i, n) => (
+        <Svg {...numberChip(n + 1, i, i.id === currentId)} alt={`${n + 1} · ${i.title} (${statusWord(i.status)})`} isInteractive />
+      ))}
+    </Box>
+  )
+}
+
+/**
+ * The side pane on desktop. On top the whole PR: title, a numbered dot per issue
+ * and what comes next. Below a divider, the open issue in a card of its own.
+ */
 export function desktopPane(
   D: Desk,
   r: Review,
@@ -651,52 +717,59 @@ export function desktopPane(
   layout: DiffLayout,
   toggleLayout: () => void,
 ) {
-  const { Box, Text, Svg, Progress } = D
+  const { Box, Text, Svg } = D
   const total = r.issues.length
   const handled = r.issues.filter(i => i.status !== 'open').length
   const current = r.issues.find(i => i.id === r.currentId && i.status === 'open')
-  const progress = total > 0 ? progressRow(D, r) : null
+  const index = current ? r.issues.indexOf(current) : -1
+  const next = r.issues.slice(index + 1).find(i => i.status === 'open')
+  const isReading = r.phase === 'walkthrough' && current !== undefined
+
+  const head = (
+    <Box flexDirection="column">
+      <Text size="caption" dimColor wrap="truncate-end">
+        PR {r.pr} · {PHASE_LABEL[r.phase]}
+        {total > 0 ? ` · ${handled} of ${total} handled` : ''}
+      </Text>
+      <Text weight="semibold" wrap={isWidget ? 'truncate-end' : 'wrap'}>
+        {r.title}
+      </Text>
+    </Box>
+  )
 
   if (isWidget) {
     return (
       <Box flexDirection="column" rowGap={1}>
-        <Text size="footnote" weight="semibold" wrap="truncate-end">
-          PR {r.pr} · {PHASE_LABEL[r.phase]}
-        </Text>
-        {progress}
-        {current && (
-          <Box flexDirection="row" columnGap={1} alignItems="center">
-            <Svg {...statusIcon(current.status, current.severity, true)} alt="huidig" />
-            <Text size="footnote" wrap="truncate-end">
-              {current.title}
-            </Text>
-          </Box>
-        )}
+        {head}
+        {total > 0 && issueChips(D, r, current?.id)}
       </Box>
     )
   }
 
-  const isReading = r.phase === 'walkthrough' && current !== undefined
   return (
     <Box flexDirection="column" rowGap={1}>
-      <Box flexDirection="column">
-        <Text size="caption" dimColor wrap="truncate-end">
-          PR {r.pr} · {PHASE_LABEL[r.phase]}
-        </Text>
-        <Text weight="semibold">{r.title}</Text>
-      </Box>
+      {head}
       {!isReading && stepperRow(D, r.phase)}
-      {progress}
-      {isReading && current && issueDetail(D, r, current, layout, toggleLayout)}
-      {total > 0 && (
-        <Box flexDirection="column" rowGap={1}>
-          {isReading && (
-            <Text size="footnote" weight="semibold" dimColor>
-              Alle issues
-            </Text>
-          )}
-          {issueList(D, r)}
+      {total > 0 && issueChips(D, r, current?.id)}
+      {isReading && next && (
+        <Box flexDirection="row" columnGap={1} alignItems="center">
+          <Text size="caption" dimColor>
+            Next:
+          </Text>
+          <Text size="caption" wrap="truncate-end">
+            {r.issues.indexOf(next) + 1} · {next.title}
+          </Text>
         </Box>
+      )}
+      {isReading && current ? (
+        <Box flexDirection="column" rowGap={1} paddingTop={1}>
+          <Text size="caption" weight="semibold" dimColor>
+            Issue {index + 1} of {total}
+          </Text>
+          {issueDetail(D, r, current, layout, toggleLayout)}
+        </Box>
+      ) : (
+        total > 0 && issueList(D, r)
       )}
     </Box>
   )

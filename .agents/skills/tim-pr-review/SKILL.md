@@ -1,52 +1,33 @@
 ---
 name: tim-pr-review
-description: "Tim's personal PR review workflow. Checks a pull request against the 9to5-web-dev skill's conventions plus general correctness, security, and overengineering concerns, then walks Tim through issues one at a time in severity order with fix options. Use when Tim asks to review a PR, says '/tim-pr-review', or asks to check a branch/PR against 9to5-web-dev standards."
+description: "Tim's PR review points: check a pull request against the 9to5-web-dev skill's conventions plus general correctness, security, overengineering and missing backend support. Review instructions for the pr-review-hud plugin (`/pr-review-hud :tim-pr-review <PR>`). Use when Tim asks to review a PR, says '/tim-pr-review', or asks to check a branch/PR against 9to5-web-dev standards."
 ---
 
-# Tim's PR Review
+# Tim's PR review points
 
-A personal, interactive review workflow — one issue at a time, in severity order, with fix options Tim picks from. Not a dump of findings; a conversation.
+These are **review points**: what to check in a pull request. How the review is run and shown (verdict, one issue at a time, fix options with diffs, the HUD) belongs to the `pr-review-hud` plugin.
 
-## 1. Resolve the target
+## How to run
 
-- Argument given is a PR number, branch name, or GitHub PR link → use it directly.
-- Argument is "current" or omitted and a branch is checked out that isn't main → review that branch's diff against main.
-- Otherwise ask Tim for a PR number, branch, or GitHub link.
-- The PR must already exist on GitHub — use `gh pr view`/`gh pr diff` to pull the diff and metadata, don't just diff local git state.
-- Check the PR branch out locally (`gh pr checkout <n>`) so the desktop diff pane shows its changes. If the working tree is dirty, ask Tim before switching branches.
+- **With the pr-review-hud plugin** (the skill `pr-review-hud:review` is available): load `pr-review-hud:review` and follow it, with this skill as the review instructions for its step 0. That is the same as `/pr-review-hud :tim-pr-review <PR>`.
+- **Without it**: review with the points below, then present the findings one at a time, most severe first, each with what's wrong (file:line, why it matters), how to fix it, and 2-3 fix options. Wait for Tim's choice before implementing and moving on.
 
-## 2. Review
+## Target
 
-Load the `9to5-web-dev` skill and check the diff against it first — that's the primary lens. On top of that, also flag:
+- A PR number, branch name or GitHub PR link → use it. "current" or nothing → the checked-out branch against main. Otherwise ask.
+- The PR must already exist on GitHub: pull the diff and metadata with `gh pr view` and `gh pr diff`, not just local git state.
+- Check the PR branch out locally (`gh pr checkout <n>`). If the working tree is dirty, ask before switching branches.
+
+## What to check
+
+Load the `9to5-web-dev` skill and check the diff against it first: that's the primary lens. On top of that, also flag:
 
 - General correctness and security bugs (same bar as `/code-review`).
 - Overengineering: prefer the simpler solution; flag unrequested abstractions, premature generalization, or complexity that isn't earning its place.
-- Missing backend support: if the frontend is working around something the backend should provide (an endpoint, a field, a computed value), flag it as an issue to raise with the backend team — don't treat the workaround itself as the fix to suggest.
+- Missing backend support: if the frontend works around something the backend should provide (an endpoint, a field, a computed value), flag it as an issue to raise with the backend team. Don't suggest the workaround itself as the fix.
 
-Classify each finding as **blocking**, **major**, or **minor**:
-- **Blocking** — breaks functionality, a security issue, or violates a hard 9to5-web-dev rule. Must be fixed before merge.
-- **Major** — meaningfully wrong pattern, real bug risk, or significant overengineering. Should be fixed.
-- **Minor** — style, small inconsistency, nice-to-have simplification. Worth flagging, not worth blocking on.
+## Severity
 
-## 3. Report the count, then go one at a time
-
-Open with the tally: "Found N issues — X blocking, Y major, Z minor."
-
-Then present findings **one at a time**, most severe first (blocking → major → minor; ties broken by whatever's most impactful). For each:
-
-- A concise description of the issue (file:line, what's wrong, why it matters).
-- The realistic options for fixing it (usually 2-3, including "leave as-is" when that's defensible). Lead with the option you'd actually pick and say why.
-
-**Show the code before asking.** When `mcp__ccd_view__show_pane` is available (Claude desktop app), call it before each question so Tim sees the code being discussed:
-- `pane: "diff"`, `path: <file>` — when the issue is in changed lines.
-- `pane: "file"`, `path: <file>`, `line: <n>` — when it's about unchanged surrounding code.
-
-Do the same whenever you're uncertain about a piece of code and want Tim to look at it: show it, then say what you're unsure about. Without the tool, fall back to `file:line` links plus a short fenced snippet.
-
-Present the fix options as a multiple-choice question (e.g. the built-in AskUserQuestion tool) rather than plain text, when the environment supports it. Give each code-changing option a `preview` holding the proposed change as a small unified diff, so the options can be compared side by side. The preview is rendered as markdown, so always wrap the diff in a fenced code block tagged `diff` (three backticks + `diff` on the first line, three backticks on the last) — bare `-`/`+` lines otherwise render as bullet lists and indented lines as stray code blocks. Do not move on to the next issue, or start implementing, until Tim has answered — no proceeding on an assumed or default choice.
-
-Wait for Tim's choice. If he specifies something other than a listed option, treat that as the direction — implement it. Once implemented, show a brief confirmation of what changed, then move to the next issue. Don't batch multiple issues into one turn.
-
-## 4. Browser review on request
-
-If Tim says anything that reads as wanting to look at it live — "open the browser," "let me see it," "pull it up," "I want to check this visually" — open the built-in browser to the relevant page/PR so he can log in, inspect, and annotate. Don't wait for the exact phrase "browser."
+- **Blocking**: breaks functionality, a security issue, or violates a hard 9to5-web-dev rule. Must be fixed before merge.
+- **Major**: a meaningfully wrong pattern, real bug risk, or significant overengineering. Should be fixed.
+- **Minor**: style, a small inconsistency, a nice-to-have simplification. Worth flagging, not blocking.
