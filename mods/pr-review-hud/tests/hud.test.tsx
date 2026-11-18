@@ -242,6 +242,18 @@ test('an issue is only presented with at least two options', async ($, on) => {
   expect(settle.deny).toBeUndefined()
 })
 
+test('"/pr-review-hud:skill" without a space starts a review with that skill', async ($, on) => {
+  const sent: string[] = []
+  const contexts: (readonly string[] | undefined)[] = []
+  engine(on, sent, contexts)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+
+  await $.prompt.submit({ text: '/pr-review-hud:team-review the latest PR' } as never)
+  expect(sent[0]).toContain('Review the latest PR')
+  expect(sent[0]).toContain('add the skill `team-review` on top')
+  expect(contexts[0] ?? []).toContainEqual(expect.stringContaining('Do not open the file or diff pane'))
+})
+
 test('update before start is refused', async ($, on) => {
   engine(on)
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })

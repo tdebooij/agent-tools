@@ -1,6 +1,6 @@
 {
   "name": "pr-review-hud",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Interactive PR review with a HUD: PR summary, verdict (incl. 'redo'), issues one at a time with side-by-side diffs. Bring your own review instructions or use the default.",
   "author": {
     "name": "tdebooij",

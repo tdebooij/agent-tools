@@ -35,9 +35,27 @@ const CONTRACT = [
   '- Follow the workflow in the skill `pr-review-hud:review` (load it if it is not loaded yet).',
   '- Present issues one at a time, most severe first, each through `mcp__pr-review-hud__review_update` with `currentIssueId`, `code` and 2-4 `options` (recommended first, "leave as-is" when defensible). Every code-changing option carries a unified diff with @@ hunk headers.',
   '- Do not repeat the issue in text and do not ask with AskUserQuestion: the user reads in the HUD and picks there, or types their own answer in the chat. The presenting `review_update` is the last thing in the turn.',
+  '- Do not open the file or diff pane (`mcp__ccd_view__show_pane`) for an issue, even when a review skill says to: the HUD shows the code and the diffs. Open a pane only when the user asks for it.',
   '- After a pick: implement it, mark the issue fixed, skipped or backend with a short note, then present the next one.',
   '- Review instructions are additive. The bundled `default-instructions.md` always applies; on top come `~/.claude/pr-review.md` and the repository\'s `.claude/pr-review.md` when they exist, then a skill or file the user named. They decide what to check, never how the review is shown or asked.',
 ].join('\n')
+
+/** The prompt that starts a review: the workflow skill plus the instructions named, if any. */
+function reviewPrompt(named: string | undefined, target: string): string {
+  const instructions =
+    named === undefined
+      ? 'use the default instructions plus any pr-review.md files'
+      : named.startsWith(':')
+        ? `use the default instructions plus any pr-review.md files, and add the skill \`${named.slice(1)}\` on top`
+        : `use the default instructions plus any pr-review.md files, and add the file \`${named}\` on top`
+  return (
+    `Review ${target === '' ? 'the current branch' : target} with the pr-review-hud workflow: ` +
+    `load the skill \`pr-review-hud:review\` and follow it. For step 0, ${instructions}.`
+  )
+}
+
+// "/pr-review-hud:my-skill 123" (no space) isn't a command; read it as "/pr-review-hud :my-skill 123".
+const NAMED_FORM = /^\/pr-review-hud:([A-Za-z0-9_.-]+)\s*([\s\S]*)$/
 
 const SEVERITIES: readonly Severity[] = ['blocking', 'major', 'minor']
 const STATUSES: readonly IssueStatus[] = ['open', 'fixed', 'skipped', 'backend']
@@ -534,15 +552,7 @@ export const register: Register = on => {
     const words = args.split(/\s+/).filter(w => w !== '')
     const named = words.find(w => w.startsWith(':') || w.endsWith('.md'))
     const target = words.filter(w => w !== named).join(' ')
-    const instructions =
-      named === undefined
-        ? 'use the default instructions plus any pr-review.md files'
-        : named.startsWith(':')
-          ? `use the default instructions plus any pr-review.md files, and add the skill \`${named.slice(1)}\` on top`
-          : `use the default instructions plus any pr-review.md files, and add the file \`${named}\` on top`
-    const text =
-      `Review ${target === '' ? 'the current branch' : target} with the pr-review-hud workflow: ` +
-      `load the skill \`pr-review-hud:review\` and follow it. For step 0, ${instructions}.`
+    const text = reviewPrompt(named, target)
     // Not from inside this hook: the prompt would wait on the turn the command holds.
     $.clock.after(50, () => void $.prompt.submit({ text }))
     await $.ui.open({ id: PANE, title: TITLE })
@@ -554,11 +564,14 @@ export const register: Register = on => {
   })
 
   on('prompt.submit', async ($, e, next) => {
+    const named = e.command === undefined ? NAMED_FORM.exec(e.text.trim()) : null
+    const text =
+      named !== null && named[1] !== 'review' ? reviewPrompt(`:${named[1]}`, (named[2] ?? '').trim()) : e.text
     const r = await read($, review)
     const isRunning = r !== null && r.phase !== 'done'
-    const isStarting = e.text.includes('`pr-review-hud:review`')
-    if (!isRunning && !isStarting) return next(e)
-    return next({ ...e, context: [...(e.context ?? []), CONTRACT] })
+    const isStarting = text.includes('`pr-review-hud:review`')
+    if (!isRunning && !isStarting) return text === e.text ? next(e) : next({ ...e, text })
+    return next({ ...e, text, context: [...(e.context ?? []), CONTRACT] })
   })
 
   on('tool.call', { tool: START }, async ($, e) => {

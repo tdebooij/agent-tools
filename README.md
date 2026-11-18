@@ -16,7 +16,7 @@ Skills live in `.agents/skills/<name>/` inside a project, or globally in `~/.age
 
 | Skill | Description | Install |
 |-------|-------------|---------|
-| `tim-pr-review` | Personal PR review workflow — checks a PR against the `9to5-web-dev` skill's conventions plus general correctness, security, and overengineering concerns, then walks through issues one at a time in severity order with fix options. | `npx skills add tdebooij/agent-tools@tim-pr-review` |
+| `tim-pr-review` | Tim's PR review points: the `9to5-web-dev` conventions plus correctness, security, overengineering and missing backend support. Review instructions for the `pr-review-hud` mod: `/pr-review-hud :tim-pr-review <PR>`. | `npx skills add tdebooij/agent-tools@tim-pr-review` |
 
 > New skills added to this repo will appear here.
 
