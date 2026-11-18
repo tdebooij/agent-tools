@@ -26,6 +26,8 @@ Skills live in `.agents/skills/<name>/` inside a project, or globally in `~/.age
 
 Mods are Claude Code plugins, installed from this repository's plugin marketplace.
 
+<img src="mods/harvest-live/screenshots/band.png" width="600" alt="The harvest-live band above the Claude Code prompt, suggesting a Harvest project, task and description with a Start button">
+
 | Mod | Description | Install |
 |-----|-------------|---------|
 | [`harvest-live`](mods/harvest-live) | Harvest time tracking above the prompt: suggests a project, task and description from the first prompt of each new chat and starts the timer in one press. Connect your Harvest account from the band with one pasted token. | `/plugin install harvest-live --marketplace tdebooij/agent-tools` |

@@ -4,20 +4,16 @@
 
 A Claude Code mod that keeps your [Harvest](https://www.getharvest.com) timer next to your work. On the first prompt of every new chat during working hours it opens a small band above the prompt, lets Claude pick the Harvest project, task and a short description from what you asked, and starts the timer when you press **Start**.
 
-```
-◷ Harvest                                            [Ignore]
-Project      Website · Example Client  ▾
-Task         Development  ▾
-Description  Fix the login redirect  ✎
-                                                     [Start]
-```
+<img src="screenshots/band.png" width="700" alt="The Harvest band above the Claude Code prompt, suggesting project Website relaunch for Example Client, task Development and the description Fix login redirect to return users to checkout, with a Start button">
+
+<sub>Shown in demo mode with made-up projects.</sub>
 
 ## What it does
 
 - **First prompt of each new chat** during your working hours (Monday to Friday, 9:00–18:00 unless you change them), and again the next day in a chat you keep using: the band opens and Claude suggests a project, task and description in the background. Your turn is never held up. Put `--no-harvest` anywhere in a prompt to keep the band closed for the rest of that chat today; the flag is taken out before Claude sees your prompt.
 - **One spinner while it decides**, then the filled-in rows. Click a value to change it; your choice always wins over a late suggestion.
 - **Start** creates a running time entry in Harvest. If a timer is already running, the button says **Switch** and stops that one first.
-- **`/harvest`** opens the band any time; `/harvest <what you're doing>` gets a suggestion for that text; `/harvest refresh` refetches your projects and tasks (they're cached for a day).
+- **`/harvest`** opens the band any time; `/harvest <what you're doing>` gets a suggestion for that text; `/harvest refresh` refetches your projects and tasks (they're cached for a day). If you already have a skill or command called `harvest`, the mod's command is `/harvest-live` instead.
 - Claude can tell the band what the work is once it has read the linked ticket or issue, so the suggestion gets better as the conversation goes.
 
 ## Install
@@ -73,6 +69,16 @@ The band only opens by itself during your working hours. Change them in `/config
 | Working hours end | `18:00` | 24-hour `HH:MM`; `24:00` for the end of the day |
 
 Or from a shell: `echo '{"workStart": "08:00", "workEnd": "17:00"}' | claude plugin configure harvest-live@agent-tools --values-stdin`. `/harvest` works at any time.
+
+## Demo mode
+
+Turn on **Demo mode** to try the band without a Harvest account: it shows made-up projects and starts pretend timers, and sends nothing to Harvest.
+
+```bash
+echo '{"demo": true}' | claude plugin configure harvest-live@agent-tools --values-stdin
+```
+
+Set it back to `false` to use your real account.
 
 ## Privacy
 

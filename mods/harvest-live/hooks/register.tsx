@@ -155,7 +155,34 @@ async function save($: any, token: string, account: Option, who = '') {
   void seed($)
 }
 
+// Demo mode (a setting): made-up projects and timers, nothing sent to Harvest. For screenshots and trying the mod out.
+let isDemo = false
+let demoRunning: any = null
+const DEMO_ASSIGNMENTS = [
+  { project: { id: 101, name: 'Website relaunch' }, client: { name: 'Example Client' }, task_assignments: [{ task: { id: 1, name: 'Development' } }, { task: { id: 2, name: 'Design' } }, { task: { id: 3, name: 'Project management' } }] },
+  { project: { id: 102, name: 'Mobile app' }, client: { name: 'Sample Studio' }, task_assignments: [{ task: { id: 1, name: 'Development' } }, { task: { id: 4, name: 'Testing' } }] },
+  { project: { id: 103, name: 'Internal tools' }, client: { name: 'Your Company' }, task_assignments: [{ task: { id: 1, name: 'Development' } }, { task: { id: 5, name: 'Meetings' } }] },
+]
+function demoApi(method: string, path: string, body?: any) {
+  if (path.startsWith('/users/me/project_assignments')) return { project_assignments: DEMO_ASSIGNMENTS }
+  if (path.startsWith('/users/me')) return { id: 1 }
+  if (path.startsWith('/time_entries?')) return { time_entries: demoRunning ? [demoRunning] : [] }
+  if (method === 'PATCH') {
+    const stopped = { ...demoRunning, is_running: false }
+    demoRunning = null
+    return stopped
+  }
+  if (method === 'POST') {
+    const a = DEMO_ASSIGNMENTS.find(x => x.project.id === body?.project_id) ?? DEMO_ASSIGNMENTS[0]!
+    const t = a.task_assignments.find(x => x.task.id === body?.task_id) ?? a.task_assignments[0]!
+    demoRunning = { id: Date.now(), is_running: true, timer_started_at: new Date().toISOString(), project: a.project, task: t.task, notes: body?.notes ?? '' }
+    return demoRunning
+  }
+  return {}
+}
+
 async function api($: any, method: string, path: string, body?: unknown) {
+  if (isDemo) return demoApi(method, path, body)
   if (!creds.token) throw new Error(NOT_CONNECTED)
   if (!creds.accountId) {
     // A token set from the shell without an account ID: use its first Harvest account.
@@ -392,12 +419,36 @@ const ICONS = {
   error: { glyph: '!', color: 'warning' },
 } as const
 
+// /harvest alone seeds the first project; /harvest <what you are doing> gets a real suggestion for that text.
+async function onCommand($: any, e: any) {
+  if (e.args.trim() === 'refresh') {
+    for (const key of await $.store.keys()) if (key === 'catalog' || key === 'me') await $.store.delete(key)
+    await $.state.set(projects, [])
+    await $.state.set(tasks, [])
+    return { text: 'Harvest projects and tasks will be fetched fresh.' }
+  }
+  await $.state.set(phase, 'edit')
+  await $.state.set(editing, '')
+  await $.state.set(isOpen, true)
+  if (!creds.token && !isDemo) return { text: 'Harvest panel opened. Connect your account in it.' }
+  void loadRunning($)
+  if (e.args.trim()) void prefill($, e.args)
+  else void seed($)
+  return { text: 'Harvest panel opened.' }
+}
+
 export const register: Register = (on, options) => {
   creds = { token: String(options.harvestToken ?? '').trim(), accountId: String(options.harvestAccountId ?? '').trim() }
   hours = workingHours(options)
+  isDemo = options.demo === true
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'harvest', description: 'Open the Harvest band (/harvest refresh: refetch projects and tasks)' })
+    // /harvest, or /harvest-live when a skill or command of yours already has that name: the rest of the mod still loads.
+    try {
+      await $.command.register({ name: 'harvest', description: 'Open the Harvest band (/harvest refresh: refetch projects and tasks)' })
+    } catch {
+      await $.command.register({ name: 'harvest-live', description: 'Open the Harvest band (/harvest-live refresh: refetch projects and tasks)' })
+    }
     await $.tool.register({
       name: TOOL,
       description:
@@ -430,22 +481,8 @@ export const register: Register = (on, options) => {
   })
 
   // /harvest alone seeds the first project; /harvest <what you are doing> gets a real suggestion for that text.
-  on('command.run', { command: 'harvest' }, async ($, e) => {
-    if (e.args.trim() === 'refresh') {
-      for (const key of await $.store.keys()) if (key === 'catalog' || key === 'me') await $.store.delete(key)
-      await $.state.set(projects, [])
-      await $.state.set(tasks, [])
-      return { text: 'Harvest projects and tasks will be fetched fresh.' }
-    }
-    await $.state.set(phase, 'edit')
-    await $.state.set(editing, '')
-    await $.state.set(isOpen, true)
-    if (!creds.token) return { text: 'Harvest panel opened. Connect your account in it.' }
-    void loadRunning($)
-    if (e.args.trim()) void prefill($, e.args)
-    else void seed($)
-    return { text: 'Harvest panel opened.' }
-  })
+  on('command.run', { command: 'harvest' }, onCommand)
+  on('command.run', { command: 'harvest-live' }, onCommand)
 
   // Mirror what the model's own Harvest calls change.
   on('tool.call', async ($, e, next) => {
@@ -472,7 +509,7 @@ export const register: Register = (on, options) => {
     if (isWork && lastDay !== today) {
       await $.state.set(day, today)
       await $.state.set(isOpen, true)
-      if (!creds.token) return next(e)
+      if (!creds.token && !isDemo) return next(e)
       void loadRunning($)
       void prefill($, e.text)
       // Only point Claude at the tool when this session really has it.
@@ -492,7 +529,7 @@ export const register: Register = (on, options) => {
 
     // Set at install (creds), or just now in this band (the state write redraws it).
     const { value: hasJustConnected = false } = await $.state.get(connected)
-    const isConnected = !!creds.token || hasJustConnected
+    const isConnected = isDemo || !!creds.token || hasJustConnected
     if (!isConnected) {
       const { value: hello = '' } = await $.state.get(connectNote)
       const { value: choices = [] } = await $.state.get(accounts)
