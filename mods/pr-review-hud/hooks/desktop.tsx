@@ -103,7 +103,7 @@ export function verdictSvg(verdict: Verdict): Pic {
 
 /** A small filled chip: severity, or "recommended". */
 export function chipSvg(text: string, fill: string): Pic {
-  const w = Math.round(text.length * 7.2 + 18)
+  const w = Math.round(text.length * 7.2 + 30)
   return svg(
     w,
     20,
@@ -417,7 +417,7 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
   }
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="subtle">
+    <Box flexDirection="column" borderStyle="quote" borderColor="subtle">
       {files.map(f => (
         <Box flexDirection="column">
           {files.length > 1 && f.name !== '' && (
