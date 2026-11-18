@@ -339,6 +339,20 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
   const files = parseUnified(diff)
   if (files.length === 0) return null
 
+  // Experiment: stacked diffs use the app's own code block, highlighted by language.
+  if (layout === 'unified') {
+    const { Code } = D
+    return (
+      <Box marginTop="sm">
+        <Code
+          source={diff.split('\n').filter(l => !l.startsWith('--- ') && !l.startsWith('+++ ')).join('\n')}
+          format="diff"
+          path={files[0]?.name || undefined}
+        />
+      </Box>
+    )
+  }
+
   const sides = (f: DiffFile) =>
     f.rows.flatMap(r => ('hunk' in r ? [] : [r.left, r.right])).filter((x): x is Side => x !== undefined)
   const indentOf = (f: DiffFile) => {
@@ -571,8 +585,8 @@ export function desktopIssueRow(D: Desk, r: Review, issue: Issue) {
 }
 
 /** The open issue in full, for reading in the side pane. Picking happens in the band. */
-function issueDetail(D: Desk, r: Review, issue: Issue, layout: DiffLayout, toggleLayout: () => void) {
-  const { Box, Text, Svg, Button } = D
+function issueDetail(D: Desk, r: Review, issue: Issue, layout: DiffLayout, setLayout: (l: DiffLayout) => void) {
+  const { Box, Text, Svg, Select } = D
   const index = r.issues.findIndex(i => i.id === issue.id)
   return (
     <Box flexDirection="column" rowGap={1}>
@@ -614,11 +628,14 @@ function issueDetail(D: Desk, r: Review, issue: Issue, layout: DiffLayout, toggl
                 Options
               </Text>
               {issue.options.some(o => o.diff) && (
-                <Button
-                  key="layout-toggle"
-                  label={layout === 'split' ? 'Stacked' : 'Side by side'}
-                  plain
-                  onPress={toggleLayout}
+                <Select
+                  key="layout"
+                  options={[
+                    { value: 'split', label: 'Side by side' },
+                    { value: 'unified', label: 'Stacked' },
+                  ]}
+                  value={layout}
+                  onSelect={value => setLayout(value === 'split' ? 'split' : 'unified')}
                 />
               )}
             </Box>
@@ -715,7 +732,7 @@ export function desktopPane(
   r: Review,
   isWidget: boolean,
   layout: DiffLayout,
-  toggleLayout: () => void,
+  setLayout: (l: DiffLayout) => void,
 ) {
   const { Box, Text, Svg } = D
   const total = r.issues.length
@@ -766,7 +783,7 @@ export function desktopPane(
           <Text size="caption" weight="semibold" dimColor>
             Issue {index + 1} of {total}
           </Text>
-          {issueDetail(D, r, current, layout, toggleLayout)}
+          {issueDetail(D, r, current, layout, setLayout)}
         </Box>
       ) : (
         total > 0 && issueList(D, r)
