@@ -97,7 +97,7 @@ test('terminal: chat cards and status pane stay text', async ($, on) => {
   const surface = 'terminal' as const
 
   const overview = await $.ui.mount({ ...row(START, 's1', START_INPUT), surface })
-  expect(await overview.find({ type: 'Text', text: /Advies: Beter opnieuw opzetten/ })).toBeDefined()
+  expect(await overview.find({ type: 'Text', text: /Verdict: Better redone/ })).toBeDefined()
   await overview.unmount()
 
   const quiet = await $.ui.mount({ ...row(UPDATE, 'u1', { statuses: [{ id: '1', status: 'fixed', note: 'done' }] }), surface })
@@ -127,26 +127,26 @@ test('desktop: read in the pane, decide in the band, history in the chat', async
   const surface = 'desktop' as const
 
   const overview = await $.ui.mount({ ...row(START, 's1', START_INPUT), surface })
-  expect(await overview.find({ type: 'Text', text: /Wat lost deze PR op/ })).toBeDefined()
+  expect(await overview.find({ type: 'Text', text: /What this PR solves/ })).toBeDefined()
   await overview.unmount()
 
   const line = await $.ui.mount({ ...row(UPDATE, 'u2', PRESENT), surface })
-  expect(await line.find({ type: 'Text', text: /staat in het paneel rechts/ })).toBeDefined()
-  expect(await line.find({ type: 'Text', text: /Wat is er mis/ })).toBeUndefined()
+  expect(await line.find({ type: 'Text', text: /in the side pane/ })).toBeDefined()
+  expect(await line.find({ type: 'Text', text: /What's wrong/ })).toBeUndefined()
   await line.unmount()
 
   const dock = await $.ui.mount({ ...pane('dock'), surface })
-  expect(await dock.find({ type: 'Text', text: /Wat is er mis/ })).toBeDefined()
+  expect(await dock.find({ type: 'Text', text: /What's wrong/ })).toBeDefined()
   expect((await dock.find({ type: 'Text', text: /const b = a \+ 1/ }))?.text).toBe('const b = a + 1')
   // The PR on top (numbered dots, what's next), the issue in its own card below.
-  expect(await dock.find({ type: 'Text', text: /^Issue 2 van 3$/ })).toBeDefined()
+  expect(await dock.find({ type: 'Text', text: /^Issue 2 of 3$/ })).toBeDefined()
   expect((await dock.find({ type: 'Text', text: /^3 · Naming$/ }))?.text).toBe('3 · Naming')
-  expect(await dock.find({ type: 'Text', text: /1 van 3 afgehandeld/ })).toBeDefined()
+  expect(await dock.find({ type: 'Text', text: /1 of 3 handled/ })).toBeDefined()
   await dock.unmount()
 
   const band = await $.ui.mount({ ...BAND, surface })
   expect(await band.find({ type: 'Text', text: /2\/3 Global store/ })).toBeDefined()
-  expect(await band.find({ type: 'Text', text: /Wat is er mis/ })).toBeUndefined()
+  expect(await band.find({ type: 'Text', text: /What's wrong/ })).toBeUndefined()
   await band.press({ key: 'band-3-1' })
   expect(sent).toEqual(['Issue 3: Leave as-is'])
   // Picked: the band steps aside while Claude works on it.
@@ -154,7 +154,7 @@ test('desktop: read in the pane, decide in the band, history in the chat', async
   await band.unmount()
 
   const after = await $.ui.mount({ ...pane('dock'), surface })
-  expect(await after.find({ type: 'Text', text: /Gekozen: Leave as-is/ })).toBeDefined()
+  expect(await after.find({ type: 'Text', text: /Picked: Leave as-is/ })).toBeDefined()
   await after.unmount()
 })
 
@@ -209,7 +209,7 @@ test('/pr-review-hud queues the review with the named instructions', async ($, o
 
   const opened = await $.command.run({ command: 'pr-review-hud', args: 'open' } as never)
   await clock.advance(100)
-  expect(opened.text).toBe('PR review HUD geopend.')
+  expect(opened.text).toBe('PR review HUD opened.')
   expect(sent.length).toBe(2)
 })
 

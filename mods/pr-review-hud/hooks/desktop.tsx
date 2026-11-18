@@ -37,10 +37,10 @@ const svg = (w: number, h: number, body: string): Pic => ({
 // ---------- graphics ----------
 
 const PHASE_LABEL: Record<Phase, string> = {
-  fetching: 'PR ophalen',
-  reviewing: 'Reviewen',
-  walkthrough: 'Issues doorlopen',
-  done: 'Klaar',
+  fetching: 'Fetching PR',
+  reviewing: 'Reviewing',
+  walkthrough: 'Walkthrough',
+  done: 'Done',
 }
 const PHASES: readonly Phase[] = ['fetching', 'reviewing', 'walkthrough', 'done']
 
@@ -72,17 +72,17 @@ export function stepperSvg(phase: Phase): Pic {
 
 const VERDICT: Record<Verdict, { label: string; fill: string; icon: string }> = {
   ready: {
-    label: 'Klaar om te mergen',
+    label: 'Ready to merge',
     fill: '#5E8B57',
     icon: '<path d="M 15 24 l 5 5 l 10 -11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
   },
   'fix-issues': {
-    label: 'Eerst issues fixen',
+    label: 'Fix issues first',
     fill: '#B9792A',
     icon: '<path d="M 22 13 L 32 31 L 12 31 Z" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><line x1="22" y1="19.5" x2="22" y2="25" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="22" cy="28.2" r="1.4" fill="#fff"/>',
   },
   redo: {
-    label: 'Beter opnieuw opzetten',
+    label: 'Better redone',
     fill: '#B0473A',
     icon: '<path d="M 30.5 17.5 A 9.5 9.5 0 1 0 31.5 26" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M 31.5 11.5 L 31.5 18.5 L 24.5 18.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
   },
@@ -97,11 +97,11 @@ export function verdictSvg(verdict: Verdict): Pic {
     40,
     `<rect x="1" y="1" width="638" height="38" rx="9" fill="${v.fill}" fill-opacity="0.12" stroke="${v.fill}" stroke-opacity="0.35"/>` +
       `<g transform="translate(0 -2)">${icon}</g>` +
-      `<text x="44" y="25" style="font-family:${FONT};font-size:14px;font-weight:600;fill:${v.fill}">Advies: ${v.label}</text>`,
+      `<text x="44" y="25" style="font-family:${FONT};font-size:14px;font-weight:600;fill:${v.fill}">Verdict: ${v.label}</text>`,
   )
 }
 
-/** A small filled chip: severity, or "aanbevolen". */
+/** A small filled chip: severity, or "recommended". */
 export function chipSvg(text: string, fill: string): Pic {
   const w = Math.round(text.length * 7.2 + 18)
   return svg(
@@ -228,15 +228,28 @@ export function progressRow(D: Desk, r: Review) {
   const handled = r.issues.filter(i => i.status !== 'open').length
   return (
     <Box flexDirection="row" columnGap={1} alignItems="center">
-      <Svg {...segBar(r)} alt={`${handled} van ${r.issues.length} afgehandeld`} />
+      <Svg {...segBar(r)} alt={`${handled} of ${r.issues.length} handled`} />
       <Text size="caption" dimColor>
-        {handled} van {r.issues.length} afgehandeld
+        {handled} of {r.issues.length} handled
       </Text>
     </Box>
   )
 }
 
-export const RECOMMENDED = chipSvg('AANBEVOLEN', C.claude)
+export const RECOMMENDED = chipSvg('RECOMMENDED', C.claude)
+
+/** An option's number in the margin: filled for the recommended one, outlined for the rest. */
+export function optionNumber(n: number, isRecommended: boolean): Pic {
+  const body = isRecommended
+    ? `<circle cx="11" cy="11" r="10.5" fill="${C.claude}"/>` +
+      `<text x="11" y="15" text-anchor="middle" style="font-family:${FONT};font-size:11.5px;font-weight:600;fill:#fff">${n}</text>`
+    : `<circle cx="11" cy="11" r="10" fill="none" stroke="${C.skipped}" stroke-width="1.2"/>` +
+      `<text x="11" y="15" text-anchor="middle" class="t b" style="font-size:11.5px">${n}</text>`
+  return svg(22, 22, body)
+}
+
+/** A hairline between options, wider than any pane and clipped by its box. */
+export const DIVIDER = svg(2400, 1, `<rect x="0" y="0" width="2400" height="1" fill="${C.track}"/>`)
 
 // ---------- side-by-side diff ----------
 
@@ -492,19 +505,19 @@ export function desktopOverview(D: Desk, r: Review) {
       {stepperRow(D, r.phase)}
       {r.problem && (
         <Box flexDirection="column">
-          <Text weight="semibold">Wat lost deze PR op</Text>
+          <Text weight="semibold">What this PR solves</Text>
           <Markdown text={r.problem} />
         </Box>
       )}
       {r.approach && (
         <Box flexDirection="column">
-          <Text weight="semibold">Hoe</Text>
+          <Text weight="semibold">How</Text>
           <Markdown text={r.approach} />
         </Box>
       )}
       {r.verdict && (
         <Box flexDirection="column">
-          <Svg {...verdictSvg(r.verdict)} alt={`Advies: ${VERDICT[r.verdict].label}`} />
+          <Svg {...verdictSvg(r.verdict)} alt={`Verdict: ${VERDICT[r.verdict].label}`} />
           {r.verdictReason && <Text dimColor>{r.verdictReason}</Text>}
         </Box>
       )}
@@ -519,7 +532,7 @@ export function desktopOverview(D: Desk, r: Review) {
           {issueList(D, r)}
         </Box>
       ) : (
-        <Text color="success">Geen issues gevonden</Text>
+        <Text color="success">No issues found</Text>
       )}
     </Box>
   )
@@ -533,8 +546,8 @@ export function desktopIssueRow(D: Desk, r: Review, issue: Issue) {
   const state = !isOpen
     ? `${statusWord(issue.status)}${issue.note ? ` — ${issue.note}` : ''}`
     : issue.decision !== undefined
-      ? `gekozen: ${issue.decision}`
-      : 'open, staat in het paneel rechts'
+      ? `picked: ${issue.decision}`
+      : 'open, in the side pane'
   return (
     <Box flexDirection="row" columnGap={1} alignItems="center" flexWrap="wrap">
       <Svg {...statusIcon(issue.status, issue.severity, isOpen && issue.decision === undefined)} alt={statusWord(issue.status)} />
@@ -570,51 +583,61 @@ function issueDetail(D: Desk, r: Review, issue: Issue, layout: DiffLayout, toggl
       </Box>
       <Box flexDirection="column">
         <Text size="footnote" weight="semibold">
-          Wat is er mis
+          What's wrong
         </Text>
         {inlineText(D, issue.what || '—', 'body')}
       </Box>
       {issue.code && snippetView(D, issue.code.source, issue.code.startLine ?? issue.line)}
       <Box flexDirection="column">
         <Text size="footnote" weight="semibold">
-          Hoe lossen we het op
+          How to fix it
         </Text>
         {inlineText(D, issue.fix || '—', 'body')}
       </Box>
       {issue.decision !== undefined ? (
         <Text size="footnote" color="claude" weight="semibold">
-          ✓ Gekozen: {issue.decision}
+          ✓ Picked: {issue.decision}
         </Text>
       ) : (
         issue.options && (
           <Box flexDirection="column" rowGap={1}>
             <Box flexDirection="row" justifyContent="space-between" alignItems="center">
               <Text size="footnote" weight="semibold">
-                Opties
+                Options
               </Text>
               {issue.options.some(o => o.diff) && (
                 <Button
                   key="layout-toggle"
-                  label={layout === 'split' ? 'Onder elkaar' : 'Naast elkaar'}
+                  label={layout === 'split' ? 'Stacked' : 'Side by side'}
                   plain
                   onPress={toggleLayout}
                 />
               )}
             </Box>
             {issue.options.map((o, n) => (
-              <Box flexDirection="column" rowGap={0}>
-                <Box flexDirection="row" columnGap={1} alignItems="center" flexWrap="wrap">
-                  <Text size="footnote" weight="semibold" color={o.isRecommended ? 'claude' : undefined}>
-                    {n + 1} · {o.label}
-                  </Text>
-                  {o.isRecommended && <Svg {...RECOMMENDED} alt="aanbevolen" />}
+              <Box flexDirection="column" rowGap={1}>
+                {n > 0 && (
+                  <Box overflow="hidden">
+                    <Svg {...DIVIDER} alt="" />
+                  </Box>
+                )}
+                <Box flexDirection="row" columnGap={1} alignItems="flex-start">
+                  <Svg {...optionNumber(n + 1, o.isRecommended === true)} alt={`Option ${n + 1}`} />
+                  <Box flexDirection="column" rowGap={0} flexGrow={1} flexShrink={1}>
+                    <Box flexDirection="row" columnGap={1} alignItems="center" flexWrap="wrap">
+                      <Text size="footnote" weight="semibold">
+                        {o.label}
+                      </Text>
+                      {o.isRecommended && <Svg {...RECOMMENDED} alt="recommended" />}
+                    </Box>
+                    {o.description && inlineText(D, o.description, 'body')}
+                    {o.diff && diffView(D, o.diff, layout)}
+                  </Box>
                 </Box>
-                {o.description && inlineText(D, o.description, 'body')}
-                {o.diff && diffView(D, o.diff, layout)}
               </Box>
             ))}
             <Text size="caption" dimColor>
-              Kies onderaan bij de prompt, of typ een eigen antwoord in de chat.
+              Pick below at the prompt, or type your own answer in the chat.
             </Text>
           </Box>
         )
@@ -624,7 +647,7 @@ function issueDetail(D: Desk, r: Review, issue: Issue, layout: DiffLayout, toggl
 }
 
 const statusWord = (s: IssueStatus) =>
-  s === 'fixed' ? 'opgelost' : s === 'skipped' ? 'overgeslagen' : s === 'backend' ? 'naar backend' : 'open'
+  s === 'fixed' ? 'fixed' : s === 'skipped' ? 'skipped' : s === 'backend' ? 'to backend' : 'open'
 
 /** Every issue on one aligned row: status mark, severity tag, title, note under it. */
 function issueList(D: Desk, r: Review) {
@@ -698,7 +721,7 @@ export function desktopPane(
     <Box flexDirection="column">
       <Text size="caption" dimColor wrap="truncate-end">
         PR {r.pr} · {PHASE_LABEL[r.phase]}
-        {total > 0 ? ` · ${handled} van ${total} afgehandeld` : ''}
+        {total > 0 ? ` · ${handled} of ${total} handled` : ''}
       </Text>
       <Text weight="semibold" wrap={isWidget ? 'truncate-end' : 'wrap'}>
         {r.title}
@@ -723,7 +746,7 @@ export function desktopPane(
       {isReading && next && (
         <Box flexDirection="row" columnGap={1} alignItems="center">
           <Text size="caption" dimColor>
-            Volgende:
+            Next:
           </Text>
           <Text size="caption" wrap="truncate-end">
             {r.issues.indexOf(next) + 1} · {next.title}
@@ -733,7 +756,7 @@ export function desktopPane(
       {isReading && current ? (
         <Box flexDirection="column" rowGap={1} paddingTop={1}>
           <Text size="caption" weight="semibold" dimColor>
-            Issue {index + 1} van {total}
+            Issue {index + 1} of {total}
           </Text>
           {issueDetail(D, r, current, layout, toggleLayout)}
         </Box>

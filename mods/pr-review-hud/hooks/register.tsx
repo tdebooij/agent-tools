@@ -68,15 +68,15 @@ const SEV_COLOR: Record<Severity, string> = {
   minor: 'suggestion',
 }
 const PHASE_LABEL: Record<Phase, string> = {
-  fetching: 'PR ophalen',
-  reviewing: 'Reviewen',
-  walkthrough: 'Issues doorlopen',
-  done: 'Klaar',
+  fetching: 'Fetching PR',
+  reviewing: 'Reviewing',
+  walkthrough: 'Walkthrough',
+  done: 'Done',
 }
 const VERDICT_VIEW: Record<Verdict, { icon: string; label: string; color: string }> = {
-  ready: { icon: '✓', label: 'Klaar om te mergen', color: 'success' },
-  'fix-issues': { icon: '⚠', label: 'Eerst issues fixen', color: 'warning' },
-  redo: { icon: '⛔', label: 'Beter opnieuw opzetten', color: 'error' },
+  ready: { icon: '✓', label: 'Ready to merge', color: 'success' },
+  'fix-issues': { icon: '⚠', label: 'Fix issues first', color: 'warning' },
+  redo: { icon: '⛔', label: 'Better redone', color: 'error' },
 }
 const STATUS_ICON: Record<IssueStatus, { icon: string; color?: string }> = {
   open: { icon: '●' },
@@ -167,9 +167,9 @@ function summary(r: Review): string {
   const parts = counts.map(c => `${c.total} ${c.sev}`).join(', ')
   return (
     `HUD: PR ${r.pr} · ${PHASE_LABEL[r.phase]} · ${total} issues (${parts}) · ` +
-    `${handled}/${total} afgehandeld` +
+    `${handled}/${total} handled` +
     (r.verdict ? ` · verdict ${r.verdict}` : '') +
-    (r.currentId ? ` · huidig ${r.currentId}` : '')
+    (r.currentId ? ` · current ${r.currentId}` : '')
   )
 }
 
@@ -253,7 +253,7 @@ const fileRef = (i: Issue) =>
 const statusBlock = (E: ElementTable, r: Review) => {
   const { Box, Text, Progress } = E
   const { counts, handled, total } = tally(r)
-  if (total === 0) return <Text color="success">Geen issues gevonden</Text>
+  if (total === 0) return <Text color="success">No issues found</Text>
   return (
     <Box flexDirection="column">
       <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
@@ -275,7 +275,7 @@ const statusBlock = (E: ElementTable, r: Review) => {
           )
         })}
       </Box>
-      <Progress label="Afgehandeld" value={handled} max={total} valueText={`${handled} van ${total}`} />
+      <Progress label="Handled" value={handled} max={total} valueText={`${handled} of ${total}`} />
     </Box>
   )
 }
@@ -292,7 +292,7 @@ const verdictBox = (E: ElementTable, r: Review) => {
       paddingX={1}
     >
       <Text color={v.color} bold>
-        {v.icon} Advies: {v.label}
+        {v.icon} Verdict: {v.label}
       </Text>
       {r.verdictReason && <Text>{r.verdictReason}</Text>}
     </Box>
@@ -310,7 +310,7 @@ const overviewCard = (E: ElementTable, r: Review) => {
       {r.problem && (
         <Box flexDirection="column">
           <Text bold dimColor>
-            Wat lost deze PR op
+            What this PR solves
           </Text>
           <Markdown text={r.problem} />
         </Box>
@@ -318,7 +318,7 @@ const overviewCard = (E: ElementTable, r: Review) => {
       {r.approach && (
         <Box flexDirection="column">
           <Text bold dimColor>
-            Hoe
+            How
           </Text>
           <Markdown text={r.approach} />
         </Box>
@@ -347,7 +347,7 @@ function issueCard($: EngineInterface, E: ElementTable, r: Review, issue: Issue)
       </Box>
       <Box flexDirection="column">
         <Text bold dimColor>
-          Wat is er mis
+          What's wrong
         </Text>
         <Markdown text={issue.what || '—'} />
       </Box>
@@ -360,14 +360,14 @@ function issueCard($: EngineInterface, E: ElementTable, r: Review, issue: Issue)
       )}
       <Box flexDirection="column">
         <Text bold dimColor>
-          Hoe lossen we het op
+          How to fix it
         </Text>
         <Markdown text={issue.fix || '—'} />
       </Box>
 
       {issue.decision !== undefined || !isOpen ? (
         <Text color={isOpen ? 'claude' : (STATUS_ICON[issue.status].color ?? 'success')} bold>
-          {isOpen ? '✓ Gekozen' : `${STATUS_ICON[issue.status].icon} Afgehandeld`}
+          {isOpen ? '✓ Picked' : `${STATUS_ICON[issue.status].icon} Handled`}
           {issue.decision ? `: ${issue.decision}` : ''}
           {!isOpen && issue.note ? ` — ${issue.note}` : ''}
         </Text>
@@ -375,7 +375,7 @@ function issueCard($: EngineInterface, E: ElementTable, r: Review, issue: Issue)
         issue.options && (
           <Box flexDirection="column" rowGap={1}>
             <Text bold dimColor>
-              Kies een optie
+              Pick an option
             </Text>
             {issue.options.map((o, n) => (
               <Box
@@ -393,7 +393,7 @@ function issueCard($: EngineInterface, E: ElementTable, r: Review, issue: Issue)
                     variant={o.isRecommended ? 'primary' : 'secondary'}
                     onPress={() => void choose($, issue.id, o.label)}
                   />
-                  {o.isRecommended && <Text color="claude">aanbevolen</Text>}
+                  {o.isRecommended && <Text color="claude">recommended</Text>}
                 </Box>
                 {o.description && <Text dimColor>{o.description}</Text>}
                 {o.diff && <Code source={o.diff} format="diff" path={issue.file} />}
@@ -431,7 +431,7 @@ const quietLine = (E: ElementTable, r: Review, tool: string, input: Raw) => {
       })
     }
   }
-  if (pick(input.phase, PHASES) === 'done') parts.push({ text: '✓ Review klaar', color: 'success' })
+  if (pick(input.phase, PHASES) === 'done') parts.push({ text: '✓ Review done', color: 'success' })
   if (parts.length === 0) parts.push({ text: 'HUD bijgewerkt' })
   return (
     <Box flexDirection="column">
@@ -542,11 +542,11 @@ export const register: Register = on => {
     if (args === 'clear') {
       await update($, review, () => null)
       await $.ui.close({ id: PANE })
-      return { text: 'PR review HUD gewist.' }
+      return { text: 'PR review HUD cleared.' }
     }
     if (args === 'open') {
       await $.ui.open({ id: PANE, title: TITLE })
-      return { text: 'PR review HUD geopend.' }
+      return { text: 'PR review HUD opened.' }
     }
 
     const words = args.split(/\s+/).filter(w => w !== '')
@@ -557,8 +557,8 @@ export const register: Register = on => {
     $.clock.after(50, () => void $.prompt.submit({ text }))
     await $.ui.open({ id: PANE, title: TITLE })
     return {
-      text: `PR review gestart${target === '' ? '' : ` voor ${target}`}, met ${
-        named === undefined ? 'de standaard-instructies' : named.replace(/^:/, '')
+      text: `PR review started${target === '' ? '' : ` for ${target}`}, with ${
+        named === undefined ? 'the default instructions' : named.replace(/^:/, '')
       }.`,
     }
   })
@@ -766,7 +766,7 @@ export const register: Register = on => {
       return (
         <Box flexDirection="column">
           <Text bold>PR review</Text>
-          <Text dimColor>Nog geen review actief. Start er een met /pr-review-hud.</Text>
+          <Text dimColor>No review running. Start one with /pr-review-hud.</Text>
         </Box>
       )
     }
@@ -797,7 +797,7 @@ export const register: Register = on => {
     ) : null
     const currentLine = current ? (
       <Box flexDirection="row" columnGap={1}>
-        <Text color={SEV_COLOR[current.severity]}>Nu:</Text>
+        <Text color={SEV_COLOR[current.severity]}>Now:</Text>
         <Text wrap="truncate-end">{current.title}</Text>
       </Box>
     ) : null
@@ -859,7 +859,7 @@ export const register: Register = on => {
           </Box>
         )}
         {current?.options && current.decision === undefined && (
-          <Text dimColor>Kies in de chat.</Text>
+          <Text dimColor>Pick in the chat.</Text>
         )}
       </Box>
     )
