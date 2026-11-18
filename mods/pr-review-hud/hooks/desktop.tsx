@@ -407,7 +407,7 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
     <Box flexDirection="column" borderStyle="round" borderColor="subtle">
       {files.map(f => (
         <Box flexDirection="column">
-          {(files.length > 1 || f.name !== '') && (
+          {files.length > 1 && f.name !== '' && (
             <Box paddingX={1}>
               <Text mono size="caption" dimColor>
                 {f.name}
@@ -429,7 +429,7 @@ export function snippetView(D: Desk, source: string, startLine: number | undefin
   const cut = Number.isFinite(n) ? n : 0
   const first = startLine ?? 1
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="subtle" paddingY={1}>
+    <Box flexDirection="column">
       {lines.map((l, i) => (
         <Box flexDirection="row" columnGap={1} paddingX={1}>
           <Text mono tabular size="caption" dimColor>
@@ -447,7 +447,7 @@ export function snippetView(D: Desk, source: string, startLine: number | undefin
 }
 
 /** Short prose with `code` and **bold** spans, at a given size. */
-export function inlineText(D: Desk, text: string, size: 'caption' | 'footnote', dim = false) {
+export function inlineText(D: Desk, text: string, size: 'caption' | 'footnote' | 'body', dim = false) {
   const { Text } = D
   const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).filter(p => p !== '')
   return (
@@ -572,14 +572,14 @@ function issueDetail(D: Desk, r: Review, issue: Issue, layout: DiffLayout, toggl
         <Text size="footnote" weight="semibold">
           Wat is er mis
         </Text>
-        {inlineText(D, issue.what || '—', 'footnote')}
+        {inlineText(D, issue.what || '—', 'body')}
       </Box>
       {issue.code && snippetView(D, issue.code.source, issue.code.startLine ?? issue.line)}
       <Box flexDirection="column">
         <Text size="footnote" weight="semibold">
           Hoe lossen we het op
         </Text>
-        {inlineText(D, issue.fix || '—', 'footnote')}
+        {inlineText(D, issue.fix || '—', 'body')}
       </Box>
       {issue.decision !== undefined ? (
         <Text size="footnote" color="claude" weight="semibold">
@@ -609,7 +609,7 @@ function issueDetail(D: Desk, r: Review, issue: Issue, layout: DiffLayout, toggl
                   </Text>
                   {o.isRecommended && <Svg {...RECOMMENDED} alt="aanbevolen" />}
                 </Box>
-                {o.description && inlineText(D, o.description, 'caption', true)}
+                {o.description && inlineText(D, o.description, 'body')}
                 {o.diff && diffView(D, o.diff, layout)}
               </Box>
             ))}
@@ -731,7 +731,7 @@ export function desktopPane(
         </Box>
       )}
       {isReading && current ? (
-        <Box flexDirection="column" rowGap={1} borderStyle="round" borderColor="subtle" padding={1}>
+        <Box flexDirection="column" rowGap={1} paddingTop={1}>
           <Text size="caption" weight="semibold" dimColor>
             Issue {index + 1} van {total}
           </Text>

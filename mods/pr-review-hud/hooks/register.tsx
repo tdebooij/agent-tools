@@ -33,7 +33,7 @@ const diffLayout = atom({ plugin: 'pr-review-hud', key: 'diffLayout' } as const,
 const CONTRACT = [
   'pr-review-hud: a PR review is running in the HUD. These rules belong to the plugin; review instructions never override them.',
   '- Follow the workflow in the skill `pr-review-hud:review` (load it if it is not loaded yet).',
-  '- Present issues one at a time, most severe first, each through `mcp__pr-review-hud__review_update` with `currentIssueId`, `code` and 2-4 `options` (recommended first, "leave as-is" when defensible). Every code-changing option carries a unified diff with @@ hunk headers.',
+  '- Present issues one at a time, most severe first, each through `mcp__pr-review-hud__review_update` with `currentIssueId`, `code` and 2-4 `options` (recommended first, "leave as-is" when defensible). Add a unified diff (with @@ hunk headers) to an option when seeing the change makes the choice clearer; for a small or obvious change the description is enough.',
   '- Do not repeat the issue in text and do not ask with AskUserQuestion: the user reads in the HUD and picks there, or types their own answer in the chat. The presenting `review_update` is the last thing in the turn.',
   '- Do not open the file or diff pane (`mcp__ccd_view__show_pane`) for an issue, even when a review skill says to: the HUD shows the code and the diffs. Open a pane only when the user asks for it.',
   '- After a pick: implement it, mark the issue fixed, skipped or backend with a short note, then present the next one.',
@@ -210,7 +210,7 @@ const OPTIONS_SCHEMA = {
   type: 'array',
   description:
     'The fix options the user picks from in the HUD (2-4, recommended one first, include ' +
-    '"leave as-is" when defensible). Each code-changing option carries a unified diff.',
+    '"leave as-is" when defensible). Add a diff when seeing the change helps the choice; a sentence is enough for small or obvious changes.',
   items: {
     type: 'object',
     properties: {
@@ -636,8 +636,8 @@ export const register: Register = on => {
       if (options === undefined || options.length < 2) {
         return {
           deny:
-            `Present issue ${presenting} with \`code\` and 2-4 \`options\` (recommended first; code-changing ` +
-            'options carry a unified diff). The user picks one in the HUD.',
+            `Present issue ${presenting} with \`code\` and 2-4 \`options\` (recommended first; add a diff ` +
+            'where it helps the choice). The user picks one in the HUD.',
         }
       }
     }
