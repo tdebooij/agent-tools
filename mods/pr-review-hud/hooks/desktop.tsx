@@ -339,6 +339,16 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
   const files = parseUnified(diff)
   if (files.length === 0) return null
 
+  // Experiment: stacked diffs use the app's own code block, highlighted by language.
+  if (layout === 'unified') {
+    const { Code } = D
+    return (
+      <Box marginTop="sm">
+        <Code source={diff} format="diff" path={files[0]?.name || undefined} />
+      </Box>
+    )
+  }
+
   const sides = (f: DiffFile) =>
     f.rows.flatMap(r => ('hunk' in r ? [] : [r.left, r.right])).filter((x): x is Side => x !== undefined)
   const indentOf = (f: DiffFile) => {

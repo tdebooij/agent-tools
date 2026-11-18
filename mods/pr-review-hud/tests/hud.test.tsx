@@ -137,7 +137,8 @@ test('desktop: read in the pane, decide in the band, history in the chat', async
 
   const dock = await $.ui.mount({ ...pane('dock'), surface })
   expect(await dock.find({ type: 'Text', text: /What's wrong/ })).toBeDefined()
-  expect((await dock.find({ type: 'Text', text: /const b = a \+ 1/ }))?.text).toBe('const b = a + 1')
+  // A narrow pane stacks the diff in the app's own code block.
+  expect(await dock.find({ type: 'Code' })).toBeDefined()
   // The PR on top (numbered dots, what's next), the issue in its own card below.
   expect(await dock.find({ type: 'Text', text: /^Issue 2 of 3$/ })).toBeDefined()
   expect((await dock.find({ type: 'Text', text: /^3 · Naming$/ }))?.text).toBe('3 · Naming')
@@ -171,7 +172,9 @@ test('desktop pane: inline code, split diff when wide, toggle to unified', async
   // The snippet shows the line once; split shows it again in both columns.
   expect((await ui.findAll({ type: 'Text', text: /^const a = 1$/ })).length).toBe(3)
   await ui.press({ key: 'layout-toggle' })
-  expect((await ui.findAll({ type: 'Text', text: /^const a = 1$/ })).length).toBe(2)
+  // Stacked: the snippet's line, and the diff in a code block.
+  expect((await ui.findAll({ type: 'Text', text: /^const a = 1$/ })).length).toBe(1)
+  expect(await ui.find({ type: 'Code' })).toBeDefined()
   await ui.unmount()
 })
 
