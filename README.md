@@ -38,6 +38,13 @@ Update installed mods with `claude plugin marketplace update agent-tools`, then 
 
 ## Codex desktop plugins
 
+[Harvest Live](plugins/harvest-live) offers an editable Harvest timer at the first in-hours message each day in a chat. Connect your own Harvest account and choose your working hours in the card.
+
+```sh
+codex plugin marketplace add tdebooij/agent-tools
+codex plugin add harvest-live@agent-tools
+```
+
 [Deploy Confetti](plugins/deploy-confetti) celebrates a confirmed production rollout with emoji Codex picks for that release. The plugin README includes installation and hook setup.
 
 ---
