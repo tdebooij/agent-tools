@@ -47,6 +47,8 @@ codex plugin add harvest-live@agent-tools
 
 [Deploy Confetti](plugins/deploy-confetti) celebrates a confirmed production rollout with emoji Codex picks for that release. The plugin README includes installation and hook setup.
 
+<img src="plugins/deploy-confetti/screenshots/hook-list.png" width="590" alt="Codex CLI hook list with Deploy Confetti selected under UserPromptSubmit and deploy-confetti@agent-tools shown as the source">
+
 ---
 
 ## Installing a Skill
