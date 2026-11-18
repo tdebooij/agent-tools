@@ -364,7 +364,7 @@ window.addEventListener('message', e => {
 });
 setInterval(() => { drawTime(); paintEntry(); },15000);
 try {
-  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.2.2'},appCapabilities:{},protocolVersion:'2026-01-26'});
+  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.2.3'},appCapabilities:{},protocolVersion:'2026-01-26'});
   updateHostTheme(host.hostContext);
   post({method:'ui/notifications/initialized',params:{}});
   new ResizeObserver(() => post({method:'ui/notifications/size-changed',params:{height:Math.ceil(document.body.getBoundingClientRect().height)}})).observe(document.body);
