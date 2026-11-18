@@ -38,6 +38,8 @@ Update installed mods with `claude plugin marketplace update agent-tools`, then 
 
 ## Codex desktop plugins
 
+[Review Desk](plugins/review-desk) opens a GitHub PR briefing and walks through explained findings in Codex. It uses each reviewer’s own GitHub connection. From this checkout install it with `codex plugin marketplace add .` and `codex plugin add review-desk@agent-tools`.
+
 [Harvest Live](plugins/harvest-live) shows an editable timer card on the first prompt of a new chat. Install it from this checkout with `codex plugin marketplace add .` and `codex plugin add harvest-live@agent-tools`. See the plugin README for setup, hook trust, and testing.
 
 ---

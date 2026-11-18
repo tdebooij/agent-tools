@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "review-desk": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "server.mjs"
+      ],
+      "cwd": "."
+    }
+  }
+}

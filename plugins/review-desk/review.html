@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Review Desk</title>
+<style>
+:root { color-scheme:light dark; --paper:#f8faf6;--card:#fff;--ink:#182c20;--muted:#526559;--border:#cbd6cd;--green:#185b41;--on:#fff;--tint:#e8f2e6; font:16px/1.52 Inter,system-ui,sans-serif }
+@media(prefers-color-scheme:dark){:root{color-scheme:dark}}
+:root[style*="dark"],:root.dark {--paper:#1c241f;--card:#242f28;--ink:#ecf2ea;--muted:#b2c5b9;--border:#56665a;--green:#a4dab5;--on:#173524;--tint:#2b3e30}
+*{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--paper);overflow-wrap:anywhere}main{max-width:64rem;margin:auto;padding:clamp(14px,4vw,32px);container-type:inline-size}
+header,.controls,.kicker,.gallery{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}header{justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:.75rem}.brand{font-weight:700}.mark{background:#173426;color:#c5efac;border-radius:6px;padding:2px 7px;margin-right:7px}
+a{color:var(--green)}h1,h2,h3,p,figure,dl,fieldset{margin:0}h1{font-size:clamp(1.55rem,1.2rem + 2vw,2.5rem);line-height:1.12;letter-spacing:-.04em;margin:.55rem 0 1rem}h2,legend{font-size:1.06rem;font-weight:700;letter-spacing:-.02em}p{white-space:pre-line}.meta,.kicker,small,figcaption{color:var(--muted);font-size:.85rem}.kicker{margin-top:1rem;font-family:ui-monospace,monospace}.panel{background:var(--card);border:1px solid var(--border);padding:1rem;border-radius:10px;min-width:0}.panel>*+*,section+section,.controls{margin-top:.85rem}.columns{display:grid;gap:.85rem}.columns>*{min-width:0}@container(min-width:43rem){.columns{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}}
+pre{overflow:auto;white-space:pre;max-width:100%;background:#1b2d23;color:#e5f4e8;border-radius:7px;padding:.8rem;font: .83rem/1.55 ui-monospace,monospace}code{font-family:ui-monospace,monospace}.patch{background:var(--tint);color:var(--ink)}.gallery{align-items:flex-start}.gallery figure{width:min(100%,16rem)}figure img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:var(--tint);border-radius:6px}.meta{margin-top:.45rem}
+fieldset{padding:0;border:0;min-width:0}.choice{display:flex;align-items:flex-start;gap:.5rem;padding:.65rem;margin-top:.45rem;border:1px solid var(--border);border-radius:7px;cursor:pointer}.choice:has(:checked){border-color:var(--green);background:var(--tint)}.choice input{margin-top:.35rem;accent-color:var(--green)}.choice small{display:block}.badge{font-weight:700;color:var(--green)}button{font:inherit;font-weight:600;padding:.55rem .85rem;min-height:44px;border-radius:7px;border:1px solid var(--border);color:var(--ink);background:var(--card);cursor:pointer}.primary{background:var(--green);color:var(--on);border-color:var(--green)}button:disabled{opacity:.65;cursor:wait}:focus-visible{outline:3px solid #399cf0;outline-offset:2px}#status{color:var(--muted);margin-top:.75rem}.entry{padding:.7rem 0;border-top:1px solid var(--border)}.entry p{font-size:.9rem}
+</style></head><body><main>
+<header><span class="brand"><span class="mark" aria-hidden="true">±</span>Review Desk</span><a id="pr" target="_blank" rel="noopener noreferrer"></a></header>
+<article id="card" aria-label="Pull request review"><p>Loading review…</p></article><p id="status" role="status"></p>
+</main><script type="module">
+const el = id => document.getElementById(id)
+const parentOrigin = document.referrer ? new URL(document.referrer).origin : ''
+const pending = new Map()
+let sequence=0, state, busy=false, host
+function post(message) { parent.postMessage({jsonrpc:'2.0',...message},parentOrigin && parentOrigin!=='null' ? parentOrigin : '*') }
+function request(method,params) {
+  return new Promise((resolve,reject)=>{
+    const id=++sequence
+    const timeout=setTimeout(()=>{pending.delete(id);reject(Error('Codex did not confirm delivery. Resume this review in chat before retrying.'))},15000)
+    pending.set(id,msg=>{clearTimeout(timeout);pending.delete(id);msg.error ? reject(Error(msg.error.message)) : resolve(msg.result)})
+    post({id,method,params})
+  })
+}
+function node(tag,text,cls) {
+  const e=document.createElement(tag)
+  if (text !== undefined) e.textContent=text
+  if (cls) e.className=cls
+  return e
+}
+function link(url,text) {
+  const a=node('a',text)
+  a.href=url; a.target='_blank'; a.rel='noopener noreferrer'
+  return a
+}
+function action(label,fn,primary=false) {
+  const b=node('button',label,primary?'primary':'')
+  b.type='button'; b.onclick=()=>run(fn)
+  return b
+}
+async function run(fn) {
+  if(busy)return
+  busy=true
+  const controls=[...el('card').querySelectorAll('button,input')]
+  controls.forEach(c=>c.disabled=true)
+  el('status').textContent=''
+  try { await fn() } catch(e) { el('status').textContent=e.message }
+  finally {busy=false;controls.forEach(c=>c.disabled=false)}
+}
+async function tell(text) {
+  const message=text+' Review Desk ID '+state.id+' at revision '+state.revision+'.'
+  if(!host?.hostCapabilities?.message?.text) throw Error('Continue in chat: '+message)
+  const result=await request('ui/message',{role:'user',content:[{type:'text',text:message}]})
+  if (result?.isError) throw Error('Continue in chat: '+message)
+  el('status').textContent='Sent to Codex. The next result will appear in chat.'
+}
+async function choose(option) {
+  const result=await request('tools/call',{name:'choose_option',arguments:{id:state.id,revision:state.revision,option}})
+  if(result.isError) throw Error(result.content[0].text)
+  render(result.structuredContent)
+  if(state.pending) await tell('I chose the pending fix. Resume the review, verify the PR revision and checkout, then apply and check only the selected patch.')
+}
+function briefing(card,pr) {
+  const intro=node('section',undefined,'panel')
+  intro.append(node('h2','What this PR aims to solve'),node('p',pr.goal),node('h2','How it solves it'),node('p',pr.approach))
+  card.append(intro)
+  if(pr.images.length) {
+    const section=node('section'), gallery=node('div',undefined,'gallery')
+    section.append(node('h2','Screenshots from the PR'),gallery)
+    for(const item of pr.images) {
+      const figure=node('figure'), caption=node('figcaption')
+      if(item.inline) {
+        const img=node('img'); img.alt=item.alt; img.loading='lazy'; img.referrerPolicy='no-referrer'
+        img.onerror=()=>{img.remove();caption.prepend(node('p','Preview unavailable in this view.'))}
+        img.src=item.url; figure.append(img)
+      }
+      caption.append(link(item.url,item.alt),document.createTextNode(' · '),link(pr.url,'View description'))
+      figure.append(caption); gallery.append(figure)
+    }
+    card.append(section)
+  }
+  const controls=node('div',undefined,'controls')
+  controls.append(action('Start findings →',()=>tell('Start the findings review for this PR. Inspect the pinned changes and call set_findings.'),true))
+  card.append(controls)
+}
+function finding(card,s) {
+  const f=s.finding, cols=node('div',undefined,'columns'), why=node('section',undefined,'panel'), form=node('form',undefined,'panel')
+  for(const [title,body] of [['When it happens',f.trigger],['Why it happens',f.mechanism],['What goes wrong',f.impact]]) why.append(node('h2',title),node('p',body))
+  const code=node('pre',f.evidence); code.tabIndex=0
+  why.append(node('code',f.path+':'+f.line),code)
+  const group=node('fieldset'),legend=node('legend','Choose a response')
+  group.append(legend)
+  const preview=node('pre',undefined,'patch');preview.tabIndex=0
+  const submit=node('button',undefined,'primary');submit.type='submit'
+  let selected=s.pending?.option ?? 0
+  function pick(i) {
+    selected=i;const opt=f.options[i]
+    preview.textContent=opt.patch || '';preview.hidden=!opt.patch
+    submit.textContent=opt.kind==='fix'?'Apply selected fix':'Record decision'
+  }
+  f.options.forEach((opt,i)=>{
+    const row=node('label',undefined,'choice'),radio=node('input'),copy=node('span')
+    radio.type='radio';radio.name='option';radio.value=i;radio.checked=i===selected;radio.onchange=()=>pick(i)
+    copy.append(node('strong',opt.label),node('small',(i===0?'Recommended · ':'')+opt.reason))
+    row.append(radio,copy);group.append(row)
+  })
+  pick(selected);form.append(group,preview)
+  if(f.notice) form.append(node('p',f.notice,'meta'))
+  const controls=node('div',undefined,'controls')
+  if(s.pending) {
+    group.disabled=true
+    controls.append(action('Continue approved fix in chat',()=>tell('Resume and verify the pending fix. Check whether already applied before changing files.'),true))
+  } else {
+    controls.append(submit,action('Suggest another fix',()=>tell('Ask me for a custom direction for the active finding, then show a revised preview before editing.')))
+  }
+  form.append(controls);form.onsubmit=e=>{e.preventDefault();if(!s.pending)run(()=>choose(selected))}
+  cols.append(why,form);card.append(cols)
+  card.append(node('p',s.counts.blocking+' blocking · '+s.counts.major+' major · '+s.counts.minor+' minor','meta'))
+  if(s.log.length) card.append(node('p','Last decision · '+s.log.at(-1).outcome+' · '+s.log.at(-1).title,'meta'))
+}
+function summary(card,s) {
+  if(!s.log.length)card.append(node('p','No findings in the reviewed scope.'))
+  for(const entry of s.log) {
+    const row=node('section',undefined,'entry')
+    row.append(node('span',entry.outcome+' · '+entry.severity,'badge'),node('h2',entry.title),node('p',entry.details))
+    card.append(row)
+  }
+}
+function render(s) {
+  if(!s?.pr || (state?.id===s.id && state.revision>s.revision))return
+  state=s
+  const card=el('card'), pr=s.pr
+  el('pr').textContent=pr.repository+' #'+pr.number;el('pr').href=pr.url
+  card.replaceChildren()
+  const position=s.stage==='finding' ? s.finding.severity+' · Finding '+(s.index+1)+' of '+s.total : s.stage==='briefing'?'PR briefing':'Review summary'
+  card.append(node('div',position+' · '+pr.head.slice(0,7),'kicker'))
+  const title=node('h1',s.finding?.title || pr.title);title.tabIndex=-1;card.append(title)
+  if(s.stage==='briefing')briefing(card,pr)
+  else if(s.stage==='finding')finding(card,s)
+  else summary(card,s)
+  if(s.coverage)card.append(node('p','Review scope · '+s.coverage,'meta'))
+  if(busy)title.focus({preventScroll:true})
+}
+function theme(value) {
+  document.documentElement.classList.toggle('dark',value==='dark'||(!value && matchMedia('(prefers-color-scheme: dark)').matches))
+  if(value==='light'||value==='dark') document.documentElement.style.colorScheme=value
+}
+document.addEventListener('click',e=>{
+  const a=e.target.closest('a[href]')
+  if(!a || !host?.hostCapabilities?.openLinks)return
+  e.preventDefault()
+  run(async()=>{const r=await request('ui/open-link',{url:a.href});if(r?.isError)throw Error('Open this link in your browser: '+a.href)})
+})
+window.addEventListener('message',e=>{
+  if(e.source!==parent || (parentOrigin && parentOrigin!=='null' && e.origin!==parentOrigin) || e.data?.jsonrpc!=='2.0')return
+  const msg=e.data
+  if(pending.has(msg.id))pending.get(msg.id)(msg)
+  else if(msg.method==='ui/notifications/tool-result')render(msg.params.structuredContent)
+  else if(msg.method==='ui/notifications/host-context-changed')theme(msg.params.theme)
+  else if(msg.method==='ui/resource-teardown')post({id:msg.id,result:{}})
+})
+try {
+  host=await request('ui/initialize',{appInfo:{name:'review-desk',version:'0.1.3'},appCapabilities:{},protocolVersion:'2026-01-26'})
+  theme(host.hostContext?.theme)
+  post({method:'ui/notifications/initialized',params:{}})
+  new ResizeObserver(()=>post({method:'ui/notifications/size-changed',params:{height:Math.ceil(document.body.getBoundingClientRect().height)}})).observe(document.body)
+} catch(e){el('status').textContent=e.message}
+</script></body></html>

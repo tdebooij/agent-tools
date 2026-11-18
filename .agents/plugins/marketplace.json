@@ -6,5 +6,10 @@
     "source": {"source": "local", "path": "./plugins/harvest-live"},
     "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
     "category": "Productivity"
+  }, {
+    "name": "review-desk",
+    "source": {"source": "local", "path": "./plugins/review-desk"},
+    "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+    "category": "Developer Tools"
   }]
 }

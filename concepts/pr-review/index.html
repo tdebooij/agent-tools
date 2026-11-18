@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review Desk · PR review prototype</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme:light; --paper:#f8f8f4; --ink:#172921; --muted:#506257; --line:#cdd5ca; --green:#155d43; --mint:#dcecd7; --red:#933b2b; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.5 "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif }
+  h1,h2,p,pre,dl,fieldset { margin:0 }
+  h1,h2 { line-height:1.13; letter-spacing:-.045em }
+  h1 { font-size:clamp(2rem,4vw,3.5rem); max-width:22ch; font-weight:640 }
+  h2,legend { font-size:1.25rem; font-weight:650 }
+  .mono,pre,.eyebrow { font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace }
+  .eyebrow { font-size:.74rem; font-weight:650; letter-spacing:.09em; text-transform:uppercase }
+  header { border-bottom:1px solid var(--line); background:#fff }
+  .frame,main,footer { max-width:1200px; margin:auto; padding-inline:clamp(18px,4vw,58px) }
+  .frame,.review-progress,.file { display:flex; align-items:center; justify-content:space-between; gap:12px }
+  .frame { height:68px }
+  .brand { display:flex; align-items:center; gap:10px; font-size:1.15rem; font-weight:700; letter-spacing:-.04em }
+  .mark { width:31px; height:31px; border-radius:8px; background:var(--ink); color:#bbeba7; display:grid; place-items:center; font:bold 19px/1 monospace }
+  .muted,small { color:var(--muted) }
+  .sample { font: .76rem ui-monospace,monospace; color:var(--muted) }
+  .crumb { padding-block:21px; border-bottom:1px solid var(--line); font-size:.83rem; color:var(--muted) }
+  .crumb span { margin-inline:8px; color:#809183 }
+  .hero { padding:37px 0 26px }
+  .hero .eyebrow { margin-bottom:12px; color:var(--green) }
+  .hero p { color:var(--muted); margin-top:12px; max-width:68ch }
+  .grid { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:24px; align-items:start }
+  .grid > * { min-width:0 }
+  .panel { background:white; border:1px solid var(--line); border-radius:13px; overflow:hidden; min-width:0 }
+  .pad { padding:24px }
+  .pad > * + * { margin-top:17px }
+  .file { padding:12px 16px; border-bottom:1px solid #3e4b43; color:#d8e5da; font-size:.8rem; flex-wrap:wrap }
+  .editor { background:#172820; color:#e6eee7; border-color:#2a3b31 }
+  pre { font-size:.79rem; line-height:1.8; overflow:auto; padding:14px 0 }
+  .code-line { display:block; padding-inline:16px; width:max-content; min-width:100% }
+  .hot { background:#56372c; color:#ffe0cb }
+  .add { background:#dff0db; color:#164e32 }
+  .del { background:#f7e7df; color:#722f22 }
+  .patch { background:#fff; border-radius:7px; border:1px solid var(--line); margin-top:6px }
+  .section { margin:20px 0 8px }
+  .badge { display:inline-block; font-weight:650; font-size:.78rem; border:1px solid var(--line); border-radius:30px; padding:3px 9px; background:white }
+  .blocking { color:var(--red); background:#f9e7de; border-color:#edcaba }
+  .major { color:#715222; background:#f8efd9; border-color:#e6d5a9 }
+  .minor { color:#3b585e; background:#e4eef0; border-color:#c3d5da }
+  .meta { display:flex; gap:8px; align-items:center; flex-wrap:wrap; color:var(--muted); font-size:.86rem }
+  fieldset { border:0; padding:0; min-width:0 }
+  legend { padding:0; margin-bottom:12px; letter-spacing:-.035em }
+  .choice { display:flex; gap:10px; align-items:start; border:1px solid var(--line); padding:12px; border-radius:8px; margin-top:8px; cursor:pointer }
+  .choice:has(input:checked) { background:#edf4e9; border-color:var(--green) }
+  .choice input { margin-top:5px; accent-color:var(--green) }
+  .choice small { display:block; margin-top:3px }
+  .rec { color:var(--green); font-size:.74rem; display:block; font-weight:650 }
+  button,.input { font:inherit; border:1px solid #748579; border-radius:7px; padding:10px 14px; min-height:48px }
+  button { cursor:pointer; font-weight:620; background:white; color:var(--ink) }
+  button.primary { background:var(--green); border-color:var(--green); color:white }
+  button:hover { filter:brightness(.95) }
+  :focus-visible { outline:3px solid #1677cb; outline-offset:3px }
+  .input { width:100%; margin-top:6px }
+  .wide { width:100% }
+  .info { background:#e7eee2; padding:24px; border-radius:12px }
+  dl { display:grid; grid-template-columns:auto 1fr; gap:11px 16px; font-size:.9rem }
+  dt { color:var(--muted) }
+  dd { margin:0; text-align:right; overflow-wrap:anywhere }
+  footer { color:var(--muted); font-size:.82rem }
+  .review-progress { flex-wrap:wrap; margin-bottom:16px }
+  .review-progress .eyebrow { margin:0 }
+  .result { display:grid; grid-template-columns:100px 1fr; gap:18px; padding:17px 0; border-top:1px solid var(--line); align-items:baseline }
+  footer { margin-top:34px; padding-bottom:24px }
+  [hidden] { display:none !important }
+  #feedback:empty { display:none }
+  #feedback { color:var(--green); background:#e8efe4; border-left:3px solid var(--green); padding:8px 12px; margin-bottom:16px }
+  @media(max-width:780px) { .grid { grid-template-columns:1fr; gap:16px } .hero { padding-top:25px } .pad { padding:18px } .frame { height:56px } .result { grid-template-columns:1fr; gap:3px } }
+</style>
+<header><div class="frame"><div class="brand"><span class="mark" aria-hidden="true">±</span>Review Desk</div><span class="sample">Codex plugin concept · Sample data</span></div></header>
+<main>
+  <div class="crumb mono">folio <span>/</span> notes-web <span>/</span> #128</div>
+  <section id="open">
+    <div class="hero"><div class="eyebrow">Pull request</div><h1 tabindex="-1">Open a review</h1><p>Choose the pull request you want to walk through with Codex.</p></div>
+    <div class="grid">
+      <form id="target-form" class="panel pad" aria-labelledby="target-title">
+        <h2 id="target-title">Review target</h2>
+        <div><label for="target">PR number, GitHub link, or branch</label><input id="target" class="input mono" name="target" required value="#128" autocorrect="off" autocapitalize="none" spellcheck="false" aria-describedby="target-help"><small id="target-help">Try #128 or the current branch, feature/pinned-notes.</small></div>
+        <button class="primary">Review sample PR →</button>
+      </form>
+      <div class="info pad"><div class="eyebrow">Sample pull request</div><h2>Add pinned notes to notebooks</h2><dl><dt>Branch</dt><dd class="mono">feature/pinned-notes</dd><dt>Base</dt><dd class="mono">main</dd><dt>Reviewed head</dt><dd class="mono">7f3a91c</dd></dl></div>
+    </div>
+  </section>
+  <section id="review" hidden>
+    <div class="hero"><div class="review-progress"><div class="eyebrow" id="position"></div><div class="meta" aria-label="Review tally"><span class="badge blocking">1 blocking</span><span class="badge major">1 major</span><span class="badge minor">1 minor</span></div></div><h1 id="finding-title" tabindex="-1"></h1><p id="why"></p></div>
+    <div id="feedback" role="status"></div>
+    <div class="grid">
+      <div>
+        <div class="panel editor"><div class="file"><strong class="mono" id="file"></strong><span>PR head · 7f3a91c</span></div><pre id="evidence" tabindex="0" aria-label="Code at the reviewed revision"></pre></div>
+        <div class="eyebrow section" id="preview-label">Proposed patch</div>
+        <pre id="preview" class="patch" aria-labelledby="preview-label" tabindex="0"></pre>
+      </div>
+      <form id="decision" class="panel pad" aria-labelledby="decision-title">
+        <div class="meta"><span id="severity"></span><span id="lens"></span></div>
+        <fieldset><legend id="decision-title">How should we handle this?</legend><div id="choices"></div></fieldset>
+        <button id="confirm" class="primary wide"></button>
+      </form>
+    </div>
+  </section>
+  <section id="summary" hidden>
+    <div class="hero"><div class="eyebrow">Review summary · #128</div><h1 tabindex="-1">Review complete</h1><p id="summary-stats"></p></div>
+    <div class="grid"><div class="panel pad"><h2>Decision log</h2><div id="log"></div></div><div class="info pad"><div class="eyebrow">Next steps</div><h2 id="next-title"></h2><p id="next-detail"></p><button id="restart" type="button">Restart sample</button></div></div>
+  </section>
+</main>
+<footer>Interactive mockup. Decisions affect this sample session only.</footer>
+<script>
+const findings = [
+  {
+    title: 'A repeat unpin removes the last pin', severity: 'Blocking', lens: 'Correctness',
+    why: 'If a note is already absent, findIndex returns −1. A second unpin then removes the last pinned note and saves that change.',
+    file: 'src/stores/pins.ts', line: 40, hot: 2,
+    code: ['async function unpin(id: string) {', '  const index = pins.findIndex(p => p.id === id)', '  pins.splice(index, 1)', '  await savePins(pins)', '}'],
+    choices: [
+      ['Guard the missing index', 'Reuses the index we already looked up and skips the unnecessary save.', '@@ -41,2 +41,3 @@\n   const index = pins.findIndex(p => p.id === id)\n+  if (index === -1) return\n   pins.splice(index, 1)'],
+      ['Check membership first', 'Also handles a repeat unpin, but scans twice for a present note.', '@@ -40,2 +40,3 @@\n async function unpin(id: string) {\n+  if (!pins.some(p => p.id === id)) return\n   const index = pins.findIndex(p => p.id === id)']
+    ]
+  },
+  {
+    title: 'The pinned count stops at page one', severity: 'Major', lens: 'Backend support',
+    why: 'The notebook header promises a total. Its query returns only the first page, so a notebook with 35 pins displays 20.',
+    file: 'src/notebooks/pinned-count.ts', line: 12, hot: 1,
+    code: ['const page = await fetchPins({ limit: 20 })', 'return page.items.length'],
+    choices: [
+      ['Request a total from the API', 'Record a backend follow-up for a totalCount field.', 'Request totalCount on the paginated pins response.\nVerify a notebook with 35 pins displays 35.', 'Follow-up'],
+      ['Defer the count decision', 'Keep the discrepancy open for the next review.', 'The current implementation stays in the sample.','Open']
+    ]
+  },
+  {
+    title: 'The pinned check repeats a boolean conversion', severity: 'Minor', lens: 'Simplicity',
+    why: 'The comparison already produces a boolean. Dropping the wrapper keeps the same result for every value.',
+    file: 'src/notes/is-pinned.ts', line: 4, hot: 1,
+    code: ['export function isPinned(note: Note) {', '  return Boolean(note.pinned === true)', '}'],
+    choices: [
+      ['Remove the wrapper', 'Keep the existing strict comparison.', '@@ -5 +5 @@\n-  return Boolean(note.pinned === true)\n+  return note.pinned === true'],
+      ['Leave as-is', 'Accept the redundant conversion.', 'The current implementation stays in the sample.', 'Accepted']
+    ]
+  }
+]
+const byId = id => document.getElementById(id)
+const decisions = []
+function show(id) {
+  for (const name of ['open', 'review', 'summary']) byId(name).hidden = name !== id
+  byId(id).querySelector('h1').focus({preventScroll:true})
+  window.scrollTo(0, 0)
+}
+function line(text, style) {
+  const element = document.createElement('span')
+  element.className = 'code-line ' + style
+  element.textContent = text
+  return element
+}
+function drawPreview() {
+  const f = findings[decisions.length]
+  const choice = f.choices[Number(byId('decision').elements.choice.value)]
+  byId('preview-label').textContent = choice[3] ? 'Decision preview' : 'Proposed patch'
+  byId('preview').replaceChildren(...choice[2].split('\n').map(s => line(s, s.startsWith('+') ? 'add' : s.startsWith('-') ? 'del' : '')))
+  byId('confirm').textContent = choice[3] ? 'Record decision →' : 'Apply sample fix →'
+}
+function drawFinding() {
+  const f = findings[decisions.length]
+  byId('position').textContent = 'Finding ' + (decisions.length + 1) + ' of ' + findings.length
+  byId('finding-title').textContent = f.title
+  byId('why').textContent = f.why
+  byId('severity').textContent = f.severity
+  byId('severity').className = 'badge ' + f.severity.toLowerCase()
+  byId('lens').textContent = f.lens
+  byId('file').textContent = f.file + ':' + (f.line + f.hot)
+  byId('evidence').replaceChildren(...f.code.map((s, i) => line((i === f.hot ? '› ' : '  ') + (f.line + i) + '  ' + s, i === f.hot ? 'hot' : '')))
+  byId('choices').replaceChildren()
+  for (const [i, choice] of f.choices.entries()) {
+    const label = document.createElement('label')
+    label.className = 'choice'
+    const radio = document.createElement('input')
+    radio.type = 'radio'
+    radio.name = 'choice'
+    radio.value = i
+    radio.checked = i === 0
+    const copy = document.createElement('span')
+    const name = document.createElement('strong')
+    name.textContent = choice[0]
+    const detail = document.createElement('small')
+    detail.textContent = choice[1]
+    if (i === 0) {
+      const rec = document.createElement('span')
+      rec.className = 'rec'
+      rec.textContent = 'Recommended'
+      copy.append(rec)
+    }
+    copy.append(name, detail)
+    label.append(radio, copy)
+    byId('choices').append(label)
+  }
+  drawPreview()
+  show('review')
+}
+function drawSummary() {
+  const counts = ['Applied', 'Follow-up', 'Open', 'Accepted'].map(state => [state, decisions.filter(d => d.state === state).length])
+  byId('summary-stats').textContent = counts.filter(([, n]) => n).map(([state, n]) => n + ' ' + state.toLowerCase()).join(' · ') + ' in this sample.'
+  byId('log').replaceChildren()
+  for (const [i, decision] of decisions.entries()) {
+    const item = document.createElement('div')
+    item.className = 'result'
+    const status = document.createElement('strong')
+    status.textContent = decision.state
+    const copy = document.createElement('div')
+    copy.textContent = findings[i].title
+    const detail = document.createElement('small')
+    detail.textContent = decision.choice
+    copy.append(document.createElement('br'), detail)
+    item.append(status, copy)
+    byId('log').append(item)
+  }
+  const followup = decisions[1].state === 'Follow-up'
+  byId('next-title').textContent = followup ? 'Backend follow-up' : 'Open count discrepancy'
+  byId('next-detail').textContent = followup ? findings[1].choices[0][2] : 'Decide how the header should count pins across all pages.'
+  show('summary')
+}
+byId('target-form').onsubmit = event => {
+  event.preventDefault()
+  const input = byId('target')
+  if (!['128','#128','current','feature/pinned-notes','https://github.com/folio/notes-web/pull/128'].includes(input.value.trim())) {
+    input.setCustomValidity('This mockup supports sample PR #128. Enter #128 to continue.')
+    input.reportValidity()
+    return
+  }
+  drawFinding()
+}
+byId('target').oninput = event => event.target.setCustomValidity('')
+byId('decision').onchange = drawPreview
+byId('decision').onsubmit = event => {
+  event.preventDefault()
+  const f = findings[decisions.length]
+  const choice = f.choices[Number(byId('decision').elements.choice.value)]
+  decisions.push({choice:choice[0], state:choice[3] || 'Applied'})
+  byId('feedback').textContent = (choice[3] || 'Applied in sample') + ' · ' + choice[0]
+  if (decisions.length === findings.length) drawSummary()
+  else drawFinding()
+}
+byId('restart').onclick = () => {
+  decisions.length = 0
+  byId('feedback').textContent = ''
+  byId('target-form').reset()
+  show('open')
+}
+</script>
+</html>

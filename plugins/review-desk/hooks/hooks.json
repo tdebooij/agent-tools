@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Open Review Desk for pull requests",
+            "command": "node -e \"import(require('node:url').pathToFileURL(require('node:path').join(process.env.PLUGIN_ROOT || process.env.CLAUDE_PLUGIN_ROOT,'hooks','prompt.mjs')).href)\""
+          }
+        ]
+      }
+    ]
+  }
+}
