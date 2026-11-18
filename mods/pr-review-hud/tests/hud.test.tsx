@@ -138,7 +138,10 @@ test('desktop: read in the pane, decide in the band, history in the chat', async
   const dock = await $.ui.mount({ ...pane('dock'), surface })
   expect(await dock.find({ type: 'Text', text: /Wat is er mis/ })).toBeDefined()
   expect((await dock.find({ type: 'Text', text: /const b = a \+ 1/ }))?.text).toBe('const b = a + 1')
-  expect(await dock.find({ type: 'Text', text: /Alle issues/ })).toBeDefined()
+  // The PR on top (numbered dots, what's next), the issue in its own card below.
+  expect(await dock.find({ type: 'Text', text: /^Issue 2 van 3$/ })).toBeDefined()
+  expect((await dock.find({ type: 'Text', text: /^3 · Naming$/ }))?.text).toBe('3 · Naming')
+  expect(await dock.find({ type: 'Text', text: /1 van 3 afgehandeld/ })).toBeDefined()
   await dock.unmount()
 
   const band = await $.ui.mount({ ...BAND, surface })

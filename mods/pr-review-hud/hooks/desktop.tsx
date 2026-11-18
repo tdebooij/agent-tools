@@ -1,6 +1,6 @@
 // Desktop-only drawing: SVG graphics in Claude's palette and a side-by-side diff.
 // Everything here is pure: it takes the desktop element table and plain data.
-// Only fixed strings and numbers go into SVG markup, never PR content.
+// Only fixed strings, numbers and escaped issue titles (tooltips) go into SVG markup.
 
 import type { Elements } from 'claude-code'
 
@@ -153,6 +153,29 @@ function phaseDot(state: 'done' | 'now' | 'todo'): Pic {
         ? `<circle cx="6" cy="6" r="5" fill="none" stroke="${C.claude}" stroke-width="1.5"/><circle cx="6" cy="6" r="2.4" fill="${C.claude}"/>`
         : `<circle cx="6" cy="6" r="4.5" fill="none" stroke="${C.skipped}" stroke-width="1.2"/>`
   return svg(12, 12, body)
+}
+
+const esc = (t: string) =>
+  t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/** One numbered dot per issue: green done, grey skipped, violet to backend, clay now, outlined open. */
+export function numberChip(n: number, issue: Issue, isNow: boolean): Pic {
+  const d = 20
+  const [fill, stroke, text] = isNow
+    ? [C.claude, 'none', '#fff']
+    : issue.status === 'fixed'
+      ? [C.fixed, 'none', C.fixed]
+      : issue.status === 'skipped'
+        ? [C.skipped, 'none', C.skipped]
+        : issue.status === 'backend'
+          ? [C.backend, 'none', C.backend]
+          : ['none', SEV[issue.severity], SEV[issue.severity]]
+  const isTint = !isNow && issue.status !== 'open'
+  const body =
+    `<title>${n} · ${esc(issue.title)}</title>` +
+    `<circle cx="10" cy="10" r="${stroke === 'none' ? 9.5 : 8.8}" fill="${fill}"${isTint ? ' fill-opacity="0.2"' : ''} stroke="${stroke}" stroke-width="1.4"${stroke === 'none' ? '' : ' stroke-opacity="0.7"'}/>` +
+    `<text x="10" y="13.8" text-anchor="middle" style="font-family:${FONT};font-size:10.5px;font-weight:600;fill:${text}">${n}</text>`
+  return svg(d, d, body)
 }
 
 /** Thin bar, one rounded segment per issue in its status colour. */
@@ -535,9 +558,6 @@ function issueDetail(D: Desk, r: Review, issue: Issue, layout: DiffLayout, toggl
       <Box flexDirection="column">
         <Box flexDirection="row" columnGap={1} alignItems="center" flexWrap="wrap">
           <Svg {...sevTag(issue.severity)} alt={issue.severity} />
-          <Text size="caption" dimColor>
-            Issue {index + 1} van {r.issues.length}
-          </Text>
           {issue.file && (
             <Text mono size="caption" dimColor>
               {fileRef(issue)}
@@ -643,7 +663,22 @@ function issueList(D: Desk, r: Review) {
   )
 }
 
-/** The side pane on desktop: status on top, then the open issue to read, then every issue. */
+/** The PR at a glance: one numbered dot per issue, hover for its title. */
+function issueChips(D: Desk, r: Review, currentId: string | undefined) {
+  const { Box, Svg } = D
+  return (
+    <Box flexDirection="row" columnGap={1} rowGap={1} flexWrap="wrap" alignItems="center">
+      {r.issues.map((i, n) => (
+        <Svg {...numberChip(n + 1, i, i.id === currentId)} alt={`${n + 1} · ${i.title} (${statusWord(i.status)})`} isInteractive />
+      ))}
+    </Box>
+  )
+}
+
+/**
+ * The side pane on desktop. On top the whole PR: title, a numbered dot per issue
+ * and what comes next. Below a divider, the open issue in a card of its own.
+ */
 export function desktopPane(
   D: Desk,
   r: Review,
@@ -651,52 +686,59 @@ export function desktopPane(
   layout: DiffLayout,
   toggleLayout: () => void,
 ) {
-  const { Box, Text, Svg, Progress } = D
+  const { Box, Text, Svg } = D
   const total = r.issues.length
   const handled = r.issues.filter(i => i.status !== 'open').length
   const current = r.issues.find(i => i.id === r.currentId && i.status === 'open')
-  const progress = total > 0 ? progressRow(D, r) : null
+  const index = current ? r.issues.indexOf(current) : -1
+  const next = r.issues.slice(index + 1).find(i => i.status === 'open')
+  const isReading = r.phase === 'walkthrough' && current !== undefined
+
+  const head = (
+    <Box flexDirection="column">
+      <Text size="caption" dimColor wrap="truncate-end">
+        PR {r.pr} · {PHASE_LABEL[r.phase]}
+        {total > 0 ? ` · ${handled} van ${total} afgehandeld` : ''}
+      </Text>
+      <Text weight="semibold" wrap={isWidget ? 'truncate-end' : 'wrap'}>
+        {r.title}
+      </Text>
+    </Box>
+  )
 
   if (isWidget) {
     return (
       <Box flexDirection="column" rowGap={1}>
-        <Text size="footnote" weight="semibold" wrap="truncate-end">
-          PR {r.pr} · {PHASE_LABEL[r.phase]}
-        </Text>
-        {progress}
-        {current && (
-          <Box flexDirection="row" columnGap={1} alignItems="center">
-            <Svg {...statusIcon(current.status, current.severity, true)} alt="huidig" />
-            <Text size="footnote" wrap="truncate-end">
-              {current.title}
-            </Text>
-          </Box>
-        )}
+        {head}
+        {total > 0 && issueChips(D, r, current?.id)}
       </Box>
     )
   }
 
-  const isReading = r.phase === 'walkthrough' && current !== undefined
   return (
     <Box flexDirection="column" rowGap={1}>
-      <Box flexDirection="column">
-        <Text size="caption" dimColor wrap="truncate-end">
-          PR {r.pr} · {PHASE_LABEL[r.phase]}
-        </Text>
-        <Text weight="semibold">{r.title}</Text>
-      </Box>
+      {head}
       {!isReading && stepperRow(D, r.phase)}
-      {progress}
-      {isReading && current && issueDetail(D, r, current, layout, toggleLayout)}
-      {total > 0 && (
-        <Box flexDirection="column" rowGap={1}>
-          {isReading && (
-            <Text size="footnote" weight="semibold" dimColor>
-              Alle issues
-            </Text>
-          )}
-          {issueList(D, r)}
+      {total > 0 && issueChips(D, r, current?.id)}
+      {isReading && next && (
+        <Box flexDirection="row" columnGap={1} alignItems="center">
+          <Text size="caption" dimColor>
+            Volgende:
+          </Text>
+          <Text size="caption" wrap="truncate-end">
+            {r.issues.indexOf(next) + 1} · {next.title}
+          </Text>
         </Box>
+      )}
+      {isReading && current ? (
+        <Box flexDirection="column" rowGap={1} borderStyle="round" borderColor="subtle" padding={1}>
+          <Text size="caption" weight="semibold" dimColor>
+            Issue {index + 1} van {total}
+          </Text>
+          {issueDetail(D, r, current, layout, toggleLayout)}
+        </Box>
+      ) : (
+        total > 0 && issueList(D, r)
       )}
     </Box>
   )
