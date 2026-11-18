@@ -36,6 +36,12 @@ Update installed mods with `claude plugin marketplace update agent-tools`, then 
 
 ---
 
+## Codex desktop plugins
+
+[Deploy Confetti](plugins/deploy-confetti) celebrates a confirmed production rollout with emoji Codex picks for that release. The plugin README includes installation and hook setup.
+
+---
+
 ## Installing a Skill
 
 Skills are installed using the [`skills` CLI](https://skills.sh):

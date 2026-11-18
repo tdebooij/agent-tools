@@ -1,0 +1,12 @@
+{
+  "name": "deploy-confetti",
+  "version": "0.1.0",
+  "description": "Celebrate verified production deployments in Codex with emoji chosen for each release.",
+  "license": "MIT",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Deploy Confetti",
+    "shortDescription": "Celebrate production releases",
+    "category": "Developer Tools"
+  }
+}
