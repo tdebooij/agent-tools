@@ -363,12 +363,27 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
     </Box>
   )
 
-  const separator = (
+  // The quote line: a one-eighth block at the start of every row, stacking into a hairline.
+  const bar = (
+    <Text mono size="caption" color="subtle">
+      ▏
+    </Text>
+  )
+  const barred = (row: ReturnType<typeof line>) => (
+    <Box flexDirection="row">
+      {bar}
+      <Box flexDirection="row" flexGrow={1} flexShrink={1}>
+        {row}
+      </Box>
+    </Box>
+  )
+
+  const separator = barred(
     <Box paddingX={1}>
       <Text mono size="caption" dimColor>
         ⋯
       </Text>
-    </Box>
+    </Box>,
   )
 
   const fileBlock = (f: DiffFile) => {
@@ -379,8 +394,8 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
     let dels: Side[] = []
     let adds: Side[] = []
     const flush = () => {
-      for (const d of dels) out.push(line(d, n, num(d.n)))
-      for (const a of adds) out.push(line(a, n, num(a.n)))
+      for (const d of dels) out.push(barred(line(d, n, num(d.n))))
+      for (const a of adds) out.push(barred(line(a, n, num(a.n))))
       dels = []
       adds = []
     }
@@ -393,20 +408,22 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
       }
       if (layout === 'split') {
         out.push(
-          <Box flexDirection="row">
-            <Box width="50%" flexDirection="row">
-              {line(row.left, n, num(row.left?.n))}
-            </Box>
-            <Box width="50%" flexDirection="row">
-              {line(row.right, n, num(row.right?.n))}
-            </Box>
-          </Box>,
+          barred(
+            <Box flexDirection="row" flexGrow={1}>
+              <Box width="50%" flexDirection="row">
+                {line(row.left, n, num(row.left?.n))}
+              </Box>
+              <Box width="50%" flexDirection="row">
+                {line(row.right, n, num(row.right?.n))}
+              </Box>
+            </Box>,
+          ),
         )
         continue
       }
       if (row.left?.kind === 'ctx') {
         flush()
-        out.push(line(row.right, n, num(row.right?.n)))
+        out.push(barred(line(row.right, n, num(row.right?.n))))
         continue
       }
       if (row.left) dels.push(row.left)
@@ -418,8 +435,7 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
 
   // A quote: a slim bar down the left of the diff, drawn as a filled Box so every surface shows it.
   return (
-    <Box flexDirection="row" columnGap={1} alignItems="stretch">
-      <Box width={0} borderStyle="single" borderColor="subtle" />
+    <Box flexDirection="row">
       <Box flexDirection="column" flexGrow={1} flexShrink={1}>
       {files.map(f => (
         <Box flexDirection="column">
