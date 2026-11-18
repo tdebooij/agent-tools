@@ -775,8 +775,8 @@ export const register: Register = on => {
       // Auto: side by side when the pane is wide enough; the toggle pins the user's choice.
       const chosen = await read($, diffLayout)
       const layout = chosen === 'auto' ? (e.props.bodyColumns >= 64 ? 'split' : 'unified') : chosen
-      const toggleLayout = () => void update($, diffLayout, () => (layout === 'split' ? 'unified' : 'split'))
-      return desktopPane(E as Desk, r, e.props.placement === 'widget', layout, toggleLayout)
+      const setLayout = (next: 'split' | 'unified') => void update($, diffLayout, () => next)
+      return desktopPane(E as Desk, r, e.props.placement === 'widget', layout, setLayout)
     }
 
     const { total, currentIndex } = tally(r)

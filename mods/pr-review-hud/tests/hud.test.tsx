@@ -171,7 +171,7 @@ test('desktop pane: inline code, split diff when wide, toggle to unified', async
   expect((await ui.find({ type: 'Text', text: /^pins$/ }))?.text).toBe('pins')
   // The snippet shows the line once; split shows it again in both columns.
   expect((await ui.findAll({ type: 'Text', text: /^const a = 1$/ })).length).toBe(3)
-  await ui.press({ key: 'layout-toggle' })
+  await ui.select({ key: 'layout', value: 'unified' })
   // Stacked: the snippet's line, and the diff in a code block.
   expect((await ui.findAll({ type: 'Text', text: /^const a = 1$/ })).length).toBe(1)
   expect(await ui.find({ type: 'Code' })).toBeDefined()
