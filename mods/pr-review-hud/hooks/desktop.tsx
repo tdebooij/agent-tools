@@ -416,8 +416,11 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
     return out
   }
 
+  // A quote: a slim bar down the left of the diff, drawn as a filled Box so every surface shows it.
   return (
-    <Box flexDirection="column" borderStyle="quote" borderColor="subtle">
+    <Box flexDirection="row" columnGap={1} alignItems="stretch">
+      <Box width={3} minWidth={3} backgroundColor="subtle" />
+      <Box flexDirection="column" flexGrow={1} flexShrink={1}>
       {files.map(f => (
         <Box flexDirection="column">
           {files.length > 1 && f.name !== '' && (
@@ -430,6 +433,7 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
           {fileBlock(f)}
         </Box>
       ))}
+      </Box>
     </Box>
   )
 }
