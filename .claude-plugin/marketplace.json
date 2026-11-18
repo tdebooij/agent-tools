@@ -1,11 +1,18 @@
 {
   "name": "agent-tools",
-  "owner": { "name": "tdebooij" },
+  "owner": {
+    "name": "tdebooij"
+  },
   "plugins": [
     {
       "name": "harvest-live",
       "source": "./mods/harvest-live",
       "description": "Harvest time tracking above the Claude Code prompt: suggests a project, task and description from the first prompt of each new chat and starts the timer in one press."
+    },
+    {
+      "name": "pr-review-hud",
+      "source": "./mods/pr-review-hud",
+      "description": "Interactive PR review with a HUD: PR summary, a verdict (including 'redo'), and issues one at a time with side-by-side diffs and option buttons. Bring your own review points or use the defaults."
     }
   ]
 }
