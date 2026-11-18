@@ -363,20 +363,7 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
     </Box>
   )
 
-  // The quote line: a one-eighth block at the start of every row, stacking into a hairline.
-  const bar = (
-    <Text mono size="caption" color="subtle">
-      ▏
-    </Text>
-  )
-  const barred = (row: ReturnType<typeof line>) => (
-    <Box flexDirection="row">
-      {bar}
-      <Box flexDirection="row" flexGrow={1} flexShrink={1}>
-        {row}
-      </Box>
-    </Box>
-  )
+  const barred = (row: ReturnType<typeof line>) => row
 
   const separator = barred(
     <Box paddingX={1}>
@@ -435,7 +422,8 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
 
   // A quote: a slim bar down the left of the diff, drawn as a filled Box so every surface shows it.
   return (
-    <Box flexDirection="row" marginTop="sm">
+    // A quote: the whole diff on one soft warm-grey wash, readable in light and dark.
+    <Box flexDirection="row" marginTop="sm" paddingY="xs" backgroundColor="rgba(140,132,120,0.12)">
       <Box flexDirection="column" flexGrow={1} flexShrink={1}>
       {files.map(f => (
         <Box flexDirection="column">
