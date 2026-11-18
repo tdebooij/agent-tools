@@ -31,6 +31,8 @@ Mods are Claude Code plugins, installed from this repository's plugin marketplac
 | [`harvest-live`](mods/harvest-live) | Harvest time tracking above the prompt: suggests a project, task and description from the first prompt of each new chat and starts the timer in one press. Connect your Harvest account from the band with one pasted token. | `/plugin install harvest-live --marketplace tdebooij/agent-tools` |
 | [`pr-review-hud`](mods/pr-review-hud) | Interactive PR review: explains the PR, gives a verdict (including "redo"), then walks through issues one at a time with side-by-side diffs and option buttons in the side pane and above the prompt. Add your own review points in `~/.claude/pr-review.md`, a repo's `.claude/pr-review.md`, or a skill. | `/plugin install pr-review-hud --marketplace tdebooij/agent-tools` |
 
+<img src="mods/pr-review-hud/screenshots/side-pane.png" width="560" alt="pr-review-hud side pane: the open issue with its code and fix options as side-by-side diffs">
+
 In the Claude desktop app, where `/plugin` doesn't run: click **+** next to the prompt box, then **Plugins**, **Add marketplace** with `tdebooij/agent-tools`, then **Add plugin**. From a shell: `claude plugin install <mod> --marketplace tdebooij/agent-tools`.
 
 Update installed mods with `claude plugin marketplace update agent-tools`, then `claude plugin update <mod>@agent-tools`. See each mod's README for setup.
