@@ -435,7 +435,7 @@ export function diffView(D: Desk, diff: string, layout: DiffLayout) {
 
   // A quote: a slim bar down the left of the diff, drawn as a filled Box so every surface shows it.
   return (
-    <Box flexDirection="row">
+    <Box flexDirection="row" marginTop="sm">
       <Box flexDirection="column" flexGrow={1} flexShrink={1}>
       {files.map(f => (
         <Box flexDirection="column">
