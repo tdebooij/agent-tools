@@ -2,6 +2,16 @@
 
 Review the running Harvest timer and an editable proposal in a desktop chat. The project picker groups the client and project name. Choose a task, edit the description and press **Start timer** or **Switch timer**. Switch requests a fresh entry, preserving the previous entry's description and time. **Dismiss** collapses the whole card without a Harvest request. When local storage is available, it stays dismissed when you revisit the chat.
 
+## Screenshots
+
+Review the suggested project, task and description before starting a timer.
+
+<img src="screenshots/timer-proposal.png" width="700" alt="Light-mode timer proposal for the Website redesign project, with Design selected and the description Review checkout flow for mobile">
+
+After Start, the card collapses to two lines and shows the elapsed time.
+
+<img src="screenshots/running-timer.png" width="700" alt="Dark-mode summary showing Website redesign, its description and a timer running for 17 minutes">
+
 ## Install
 
 Requires Node.js 18 or newer on the Codex PATH. The local plugin talks directly to Harvest ID and the Harvest API. Each person connects their own account from the card.
@@ -26,6 +36,8 @@ The browser encrypts the pasted token for the local plugin process before submit
 ## Working hours
 
 The default is Monday to Friday, 09:00 inclusive to 18:00 exclusive, in the local machine timezone. Expand **Working hours** in the card, or ask “Open Harvest Live working hours”. Choose weekdays, Monday to Saturday, every day, or never. The end may be 24:00. Settings are saved for this user in `$XDG_CONFIG_HOME/harvest-live/schedule.json` (normally `~/.config/harvest-live/schedule.json`). Messages outside the schedule leave the daily check available for the next message during working hours.
+
+<img src="screenshots/working-hours.png" width="700" alt="Working hours set to Monday through Friday from 09:00 to 18:00">
 
 ## How the card works
 
