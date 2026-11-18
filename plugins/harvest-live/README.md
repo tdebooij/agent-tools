@@ -13,7 +13,7 @@ codex plugin marketplace add .
 codex plugin add harvest-live@agent-tools
 ```
 
-Review and trust the installed prompt hook in Codex if prompted. Open a **new desktop chat** with a normal work request. The hook asks Codex to display the card on the first substantive prompt during working hours. Include the standalone flag `--no-harvest` in that opening prompt to skip it for that chat. You can also ask “Open Harvest Live” or “Refresh Harvest Live” at any time.
+Review and trust the installed prompt hook in Codex if prompted. Open a **new desktop chat** with a normal work request. The hook asks Codex to display the card on the first message within working hours each local day, including when you resume a chat after Start, Switch or Dismiss. Include the standalone flag `--no-harvest` in that opening prompt to skip it for that chat. You can also ask “Open Harvest Live” or “Refresh Harvest Live” at any time.
 
 The timer and working-hours views follow the Codex theme. Open **Appearance → Theme** to choose **Dark**, **Light**, or **Follow Codex**. The card remembers your choice when the host allows local storage.
 
@@ -25,7 +25,7 @@ The browser encrypts the pasted token for the local plugin process before submit
 
 ## Working hours
 
-The default is Monday to Friday, 09:00 inclusive to 18:00 exclusive, in the local machine timezone. Expand **Working hours** in the card, or ask “Open Harvest Live working hours”. Choose weekdays, Monday to Saturday, every day, or never. The end may be 24:00. Settings are saved for this user in `$XDG_CONFIG_HOME/harvest-live/schedule.json` (normally `~/.config/harvest-live/schedule.json`). Opening a chat outside the schedule skips the automatic timer check for that chat.
+The default is Monday to Friday, 09:00 inclusive to 18:00 exclusive, in the local machine timezone. Expand **Working hours** in the card, or ask “Open Harvest Live working hours”. Choose weekdays, Monday to Saturday, every day, or never. The end may be 24:00. Settings are saved for this user in `$XDG_CONFIG_HOME/harvest-live/schedule.json` (normally `~/.config/harvest-live/schedule.json`). Messages outside the schedule leave the daily check available for the next message during working hours.
 
 ## How the card works
 

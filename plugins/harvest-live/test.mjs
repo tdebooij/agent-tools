@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-function run(script, lines, directory) {
+function run(script, lines, directory, now) {
   const temporary = directory ?? mkdtempSync(join(tmpdir(),'harvest-check-'));
-  const result = spawnSync(process.execPath, [fileURLToPath(new URL(script, import.meta.url))], {
+  const clock = now ? ['--import','data:text/javascript,'+encodeURIComponent(
+    'globalThis.Date = class extends Date { constructor(...args) { super(...(args.length ? args : ['+now.getTime()+'])); } }'
+  )] : [];
+  const result = spawnSync(process.execPath, [...clock,fileURLToPath(new URL(script, import.meta.url))], {
     env: {...process.env,XDG_CONFIG_HOME:temporary,PLUGIN_DATA:temporary}, input: lines.map(line => JSON.stringify(line)).join('\n')+'\n', encoding: 'utf8'
   });
   if (!directory) rmSync(temporary,{recursive:true,force:true});
@@ -75,4 +78,23 @@ test('both first-use entry points carry a work suggestion through account setup 
     const [reply] = run('server.mjs',[{id:1,jsonrpc:'2.0',method:'tools/call',params:{name,arguments:args}}]);
     assert.deepEqual(reply.result.structuredContent,{accountOnly:true,account:null,suggestion});
   }
+});
+
+test('resuming a chat claims one in-hours card per local day regardless of yesterday’s card action', () => {
+  const dir = mkdtempSync(join(tmpdir(),'harvest-daily-'));
+  try {
+    const submit = (session_id,day,hour,prompt='Continue',extra={}) => run('hooks/prompt.mjs',
+      [{hook_event_name:'UserPromptSubmit',session_id,prompt,...extra}],dir,new Date(2026,10,day,hour));
+    for (const chat of ['started','dismissed']) {
+      assert.match(submit(chat,20,17)[0].hookSpecificOutput.additionalContext,/daily check/);
+      assert.equal(submit(chat,20,17).length,0);
+      assert.match(submit(chat,21,12)[0].hookSpecificOutput.additionalContext,/outside/);
+      assert.match(submit(chat,23,8)[0].hookSpecificOutput.additionalContext,/outside/);
+      assert.equal(submit(chat,23,9,'Do the work',{agent_id:'child'}).length,0);
+      assert.match(submit(chat,23,9)[0].hookSpecificOutput.additionalContext,/daily check for 2026-11-23/);
+      assert.equal(submit(chat,23,11).length,0);
+    }
+    assert.equal(submit('private',20,8,'--no-harvest please').length,0);
+    assert.equal(submit('private',23,10).length,0);
+  } finally { rmSync(dir,{recursive:true,force:true}); }
 });

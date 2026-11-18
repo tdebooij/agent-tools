@@ -16,7 +16,7 @@ const record = (properties, required) => ({ type: 'object', properties, required
 const ref = {type:'string',maxLength:36};
 const expected = {anyOf:[ref,{type:'null'}]};
 const suggestion = {
-  notes: {...notes,description:'Short action-oriented description of the work from the opening request, including its ticket ID if present.'},
+  notes: {...notes,description:'Short action-oriented description of the work from the current request or resumed chat, including its ticket ID if present.'},
   project_hint: {...label,description:'Likely project or client name inferred from the request or repository before assignments can be read.'},
   task_hint: {...label,description:'Likely Harvest task name or discipline, for example Design or Web.'}
 };
@@ -114,7 +114,7 @@ async function dispatch(method, params = {}) {
   switch (method) {
     case 'initialize': return {
       protocolVersion: ['2024-11-05','2025-03-26','2025-06-18','2025-11-25'].includes(params.protocolVersion) ? params.protocolVersion : '2025-11-25',
-      capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'harvest-live', version: '0.2.4' }
+      capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'harvest-live', version: '0.2.5' }
     };
     case 'ping': return {};
     case 'tools/list': return { tools: [tool, settings, save, ...personalTools] };

@@ -1,24 +1,38 @@
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-
 import { inHours, readSchedule } from '../schedule.mjs';
 
 const event = JSON.parse(readFileSync(0, 'utf8'));
 if (event.hook_event_name !== 'UserPromptSubmit' || !event.prompt?.trim() || event.agent_id) process.exit(0);
-// Claim the opening prompt even if it opts out. Keep only a hash of the session ID.
+
+const now = new Date();
+const localDay = date => [date.getFullYear(),date.getMonth()+1,date.getDate()].join('-');
+const today = localDay(now);
+const skip = /(?:^|\s)--no-harvest(?:\s|$)/.test(event.prompt);
+let active = false;
+try { active = inHours(readSchedule(),now); } catch { /* Invalid schedules suppress automatic checks. */ }
+
+function claim(path,value = '') {
+  try { writeFileSync(path,value,{flag:'wx',mode:0o600}); return true; }
+  catch (error) { if (error.code === 'EEXIST') return false; throw error; }
+}
+
 if (process.env.PLUGIN_DATA && event.session_id) {
-  const folder = join(process.env.PLUGIN_DATA, 'seen-chats');
+  const folder = join(process.env.PLUGIN_DATA,'seen-chats');
+  mkdirSync(folder,{recursive:true,mode:0o700});
   const key = createHash('sha256').update(event.session_id).digest('hex');
-  mkdirSync(folder, { recursive: true, mode: 0o700 });
-  try { writeFileSync(join(folder, key), '', {flag:'wx', mode:0o600}); }
-  catch (error) { if (error.code === 'EEXIST') process.exit(0); throw error; }
-}
-if (!/(?:^|\s)--no-harvest(?:\s|$)/.test(event.prompt)) {
-  let active = false;
-  try { active = inHours(readSchedule()); } catch { /* Unreadable settings suppress automatic prompts. */ }
-  console.log(JSON.stringify({ hookSpecificOutput: {
-    hookEventName: 'UserPromptSubmit',
-    additionalContext: !active ? 'Harvest Live is outside configured working hours or disabled. Skip the entire automatic Harvest check, including personal fallback questions. Continue the substantive request silently.' : 'During configured working hours, on the first substantive prompt of a new root chat, use only the harvest-live plugin skill and its own tools for one editable Harvest card, then immediately continue the main request. The card replaces the Harvest multiple-choice prompt when available. Do not show both. Skip delegated work, follow-ups, confirmations, resumed chats, and chats opened with the standalone --no-harvest flag. Use the opening request to prefill a description and the matching assigned project/task IDs. If no token is configured, pass that description and likely project/task names to show_account for matching after sign-in. If the plugin fails, report the failure without calling another Harvest connector. This hook never authorizes a timer change.'
-  }}));
-}
+  const chat = join(folder,key);
+  if (!claim(chat,skip ? 'opt-out' : 'enabled')) {
+    const opening = readFileSync(chat,'utf8');
+    if (opening === 'opt-out') process.exit(0);
+    // Prior releases recorded the opening day in the empty marker's modification time.
+    if (opening === '' && localDay(statSync(chat).mtime) === today) process.exit(0);
+  }
+  if (skip || !claim(chat+'.'+today+(active ? '.card' : '.outside'))) process.exit(0);
+} else if (skip) process.exit(0);
+
+const additionalContext = active
+  ? 'Harvest Live daily check for '+today+' (local date). On this first in-hours message today in this root chat, open one fresh editable Harvest card using the harvest-live skill, including when resuming after Start, Switch or Dismiss on an earlier day. Skip if the opening message opted out with standalone --no-harvest or a card was already offered today. Read the current account, assignments and timer. Suggest the work being resumed from the current request and chat. If setup is needed, pass the same description and project/task hints to show_account. Continue the main request immediately. Only the card can authorize a timer change.'
+  : 'Harvest Live is outside configured working hours or disabled. Skip the entire automatic Harvest check. A later message within working hours can trigger today’s card.';
+console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'UserPromptSubmit',additionalContext}}));

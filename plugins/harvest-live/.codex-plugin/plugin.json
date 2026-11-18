@@ -1,6 +1,6 @@
 {
   "name": "harvest-live",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Review and confirm a Harvest time entry in Codex using your own Harvest personal access token.",
   "author": {
     "name": "Tim de Booij"
