@@ -173,3 +173,19 @@ test('Switch stops a running timer and starts the new one', CONNECTED, async ($,
   expect(await ui.find({ type: 'Text', text: /Harvest error/ })).toBeUndefined()
   await ui.unmount()
 })
+
+test('demo mode shows made-up projects and starts a timer without calling Harvest', { options: { demo: true } }, async ($, on) => {
+  const clock = mock.clock(on)
+  mock.store(on)
+  on('ui.render', ($, e) => h($.ui.resolve(e).Box, {}) as never)
+  const calls: string[] = []
+  harvestStub(on, calls)
+  await $.command.run({ command: 'harvest', args: '' } as never)
+  await clock.advance(1000)
+  const ui = await $.ui.mount({ plugin: 'harvest-live', surface: 'desktop', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /Website relaunch · Example Client/ })).toBeDefined()
+  await ui.press({ key: 'start' })
+  expect(await ui.find({ type: 'Text', text: /Timer started/ })).toBeDefined()
+  expect(calls.length).toBe(0)
+  await ui.unmount()
+})

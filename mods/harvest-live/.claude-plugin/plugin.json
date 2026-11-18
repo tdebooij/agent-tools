@@ -54,6 +54,12 @@
         "Never"
       ],
       "default": "Monday to Friday"
+    },
+    "demo": {
+      "type": "boolean",
+      "title": "Demo mode",
+      "description": "Show made-up projects and timers instead of your Harvest account; nothing is sent to Harvest",
+      "default": false
     }
   }
 }
