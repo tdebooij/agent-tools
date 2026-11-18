@@ -7,7 +7,7 @@ import { days, readSchedule, saveSchedule } from './schedule.mjs';
 import { currentAccount, credential, checkAccount, wrappingKey, unwrap, saveAccount, forgetAccount, withAccountLock } from './account.mjs';
 import { harvest, listAccounts } from './harvest-api.mjs';
 
-const uri = 'ui://harvest-live/timer-v6.html';
+const uri = 'ui://harvest-live/timer-v7.html';
 const mimeType = 'text/html;profile=mcp-app';
 const id = { type: 'integer', minimum: 1 };
 const label = { type: 'string', maxLength: 1000 };
@@ -27,7 +27,7 @@ const tool = {
   inputSchema, annotations: { readOnlyHint: true, openWorldHint: false },
   _meta: { ui: { resourceUri: uri }, 'openai/outputTemplate': uri }
 };
-const meta = { 'openai/widgetMinFrameHeight': 44, ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } }, 'openai/ui': { preferredDisplayMode: 'inline', availableDisplayModes: ['inline'] } };
+const meta = { 'openai/widgetMinFrameHeight': 1, ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } }, 'openai/ui': { preferredDisplayMode: 'inline', availableDisplayModes: ['inline'] } };
 const tokenStorage = {darwin:'macOS Keychain',win32:'Windows user-protected storage'}[process.platform] ?? 'a private local file accessible to your OS user (unencrypted)';
 const resource = { uri, name: 'Harvest timer', mimeType, _meta: meta };
 
@@ -114,14 +114,14 @@ async function dispatch(method, params = {}) {
   switch (method) {
     case 'initialize': return {
       protocolVersion: ['2024-11-05','2025-03-26','2025-06-18','2025-11-25'].includes(params.protocolVersion) ? params.protocolVersion : '2025-11-25',
-      capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'harvest-live', version: '0.2.3' }
+      capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'harvest-live', version: '0.2.4' }
     };
     case 'ping': return {};
     case 'tools/list': return { tools: [tool, settings, save, ...personalTools] };
     case 'resources/templates/list': return { resourceTemplates: [] };
     case 'resources/list': return { resources: [resource] };
     case 'resources/read':
-      if (params.uri !== uri && !['ui://harvest-live/timer-v1.html','ui://harvest-live/timer-v2.html','ui://harvest-live/timer-v3.html','ui://harvest-live/timer-v4.html','ui://harvest-live/timer-v5.html'].includes(params.uri)) break;
+      if (params.uri !== uri && !['ui://harvest-live/timer-v1.html','ui://harvest-live/timer-v2.html','ui://harvest-live/timer-v3.html','ui://harvest-live/timer-v4.html','ui://harvest-live/timer-v5.html','ui://harvest-live/timer-v6.html'].includes(params.uri)) break;
       return { contents: [{ ...resource, uri: params.uri, text: readFileSync(new URL('./timer.html', import.meta.url), 'utf8') }] };
     case 'tools/call': {
       const operation = personalTools.find(t=>t.name===params.name);

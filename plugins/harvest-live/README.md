@@ -1,6 +1,6 @@
 # Harvest Live for Codex
 
-Review the running Harvest timer and an editable proposal in a desktop chat. The project picker groups the client and project name. Choose a task, edit the description and press **Start timer** or **Switch timer**. Switch requests a fresh entry, preserving the previous entry's description and time. Dismiss makes no Harvest request.
+Review the running Harvest timer and an editable proposal in a desktop chat. The project picker groups the client and project name. Choose a task, edit the description and press **Start timer** or **Switch timer**. Switch requests a fresh entry, preserving the previous entry's description and time. **Dismiss** collapses the whole card without a Harvest request. When local storage is available, it stays dismissed when you revisit the chat.
 
 ## Install
 

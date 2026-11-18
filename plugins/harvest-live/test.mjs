@@ -14,12 +14,12 @@ function run(script, lines, directory) {
 }
 test('discovery and first-use timer opening work without a token or Harvest connector', () => {
   const [init,list,read,firstUse] = run('server.mjs', [
-    ['initialize',{protocolVersion:'2025-11-25'}], ['tools/list'], ['resources/read',{uri:'ui://harvest-live/timer-v6.html'}],
+    ['initialize',{protocolVersion:'2025-11-25'}], ['tools/list'], ['resources/read',{uri:'ui://harvest-live/timer-v7.html'}],
     ['tools/call',{name:'show_timer',arguments:{}}]
   ].map(([method,params],id)=>({jsonrpc:'2.0',id,method,params})));
   assert.equal(init.result.protocolVersion,'2025-11-25');
   assert.equal(list.result.tools[0]._meta.ui.resourceUri,read.result.contents[0].uri);
-  assert.equal(read.result.contents[0]._meta['openai/widgetMinFrameHeight'],44);
+  assert.equal(read.result.contents[0]._meta['openai/widgetMinFrameHeight'],1);
   assert.match(read.result.contents[0].text,/id="token"/);
   assert.equal(firstUse.result.structuredContent.accountOnly,true);
 });

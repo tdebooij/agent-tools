@@ -3,7 +3,7 @@
 <style>
 :root{color-scheme:light dark;--surface:#fffdf9;--ink:#29261f;--muted:#635d54;--line:#d2cabd;--wash:#f4f0e8;--accent:#9b3d13;--on:#fff;--live:#317247;font:16px/1.45 "Inter",system-ui,sans-serif}
 
-*{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--surface)}main{max-width:48rem;margin:auto;padding:clamp(16px,4vw,28px)}
+*{box-sizing:border-box}body{min-height:1px;margin:0;color:var(--ink);background:var(--surface)}main{max-width:48rem;margin:auto;padding:clamp(16px,4vw,28px)}
 header,.actions,.snapshot,.brand{display:flex;align-items:center;gap:12px}header,.snapshot{justify-content:space-between}
 .brand{gap:10px}h1{font-size:1.24rem;letter-spacing:-.035em;margin:0}.mark{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;color:var(--on);background:var(--accent)}
 .clock{width:18px;height:18px;border:2px solid currentColor;border-radius:50%;position:relative}.clock:after{content:"";position:absolute;top:2px;left:6px;height:5px;width:4px;border:solid currentColor;border-width:0 0 2px 2px}
@@ -145,7 +145,7 @@ el('scheduleForm').onsubmit = async event => {
   finally { button.disabled = false; }
 };
 let cardKey, tracked, receivedAt, statusUnknown = false, polling = false, inView = false;
-function rememberEntry(value) {
+function rememberCard(value) {
   if (!cardKey) return;
   try {
     if (value) localStorage.setItem(cardKey,JSON.stringify(value));
@@ -198,13 +198,17 @@ function render(next, meta = {}) {
     cardKey = 'harvest-live.entry.'+meta.cardId;
     try {
       const saved = JSON.parse(localStorage.getItem(cardKey));
+      if (saved === 'dismissed') {
+        document.querySelector('main').hidden = true;
+        return;
+      }
       if (Number.isSafeInteger(saved?.entry?.id) && typeof saved.ref === 'string') {
         displayEntry(saved,true);
         return;
       }
     } catch { /* This card has no saved summary. */ }
   }
-  if (tracked) return;
+  if (tracked || document.querySelector('main').hidden) return;
   if (next?.accountOnly) {
     resetTimer();
     pendingSuggestion = next.suggestion;
@@ -327,7 +331,7 @@ el('form').onsubmit = async event => {
     const result = await callTool('start_personal_timer',choice);
     finished = true;
     const receipt = {ref:choice.connection_ref,entry:result.structuredContent.running};
-    displayEntry(receipt); rememberEntry(receipt); el('entryToggle').focus();
+    displayEntry(receipt); rememberCard(receipt); el('entryToggle').focus();
   } catch (err) {
     // A timeout can follow a successful write. Require fresh data before another submission.
     finished = true; el('refresh').disabled = false; el('status').textContent = err.message;
@@ -342,7 +346,7 @@ el('openControls').onclick = async () => {
   tracked = null;
   try {
     await refreshPersonal(false);
-    rememberEntry(null); el('entryCard').open = false; el('entryCard').hidden = true; el('editor').hidden = false;
+    rememberCard(null); el('entryCard').open = false; el('entryCard').hidden = true; el('editor').hidden = false;
     el('status').textContent = ''; (el('form').hidden ? el('token') : project).focus();
   } catch (err) {
     displayEntry(receipt,true); el('entryFull').textContent = err.message;
@@ -353,7 +357,13 @@ el('refresh').onclick = async () => {
   try { await refreshPersonal(true); el('status').textContent = 'Timer refreshed.'; }
   catch (err) { el('status').textContent = err.message; el('refresh').disabled = false; }
 };
-el('dismiss').onclick = () => { finished = true; el('form').hidden = true; el('refresh').hidden = true; el('status').textContent = 'Dismissed. No timer action requested.'; };
+el('dismiss').onclick = async () => {
+  finished = true;
+  rememberCard('dismissed');
+  document.querySelector('main').hidden = true;
+  try { await window.openai?.requestClose?.(); }
+  catch { /* Inline hosts can keep their own header. */ }
+};
 window.addEventListener('message', e => {
   if (e.source !== parent || (hostOrigin && hostOrigin !== 'null' && e.origin !== hostOrigin) || e.data?.jsonrpc !== '2.0') return;
   const msg = e.data;
@@ -364,7 +374,7 @@ window.addEventListener('message', e => {
 });
 setInterval(() => { drawTime(); paintEntry(); },15000);
 try {
-  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.2.3'},appCapabilities:{},protocolVersion:'2026-01-26'});
+  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.2.4'},appCapabilities:{},protocolVersion:'2026-01-26'});
   updateHostTheme(host.hostContext);
   post({method:'ui/notifications/initialized',params:{}});
   new ResizeObserver(() => post({method:'ui/notifications/size-changed',params:{height:Math.ceil(document.body.getBoundingClientRect().height)}})).observe(document.body);
