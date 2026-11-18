@@ -141,6 +141,7 @@ function render(next, meta = {}) {
   if (meta.tokenStorage) el('tokenHint').textContent = 'Saved for you in '+meta.tokenStorage+'.';
   if (next?.accountOnly) {
     resetTimer();
+    pendingSuggestion = next.suggestion;
     showIdentity(next.account);
     el('accountPanel').open = true;
     el('status').textContent = next.connectionError ?? '';
@@ -178,7 +179,7 @@ function render(next, meta = {}) {
 project.onchange = () => { dirty = true; updateTask(); };
 task.onchange = notes.oninput = () => { dirty = true; updateAction(); };
 function lock(value) { el('fields').disabled = value; el('refresh').disabled = value; }
-let account = null, encryptedToken;
+let account = null, encryptedToken, pendingSuggestion;
 function showIdentity(value) {
   account = value;
   el('identity').textContent = account ? account.name+' · '+account.workspace : 'Connect your Harvest account to track time.';
@@ -200,6 +201,16 @@ function clearSecret() {
   el('workspace').required = false; el('workspace').replaceChildren(); el('workspaceField').hidden = true;
 }
 el('token').oninput = () => { encryptedToken = undefined; el('workspaceField').hidden = true; el('workspace').required = false; el('token').required = true; };
+// Before sign-in, Codex can suggest names but cannot know this user's assignment IDs.
+function matchAssignment(options, hint, names) {
+  const normalize = text => (text ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+  const target = normalize(hint);
+  if (!target) return;
+  const exact = options.filter(option => names(option).some(name => normalize(name) === target));
+  if (exact.length) return exact.length === 1 ? exact[0] : undefined;
+  const matches = options.filter(option => names(option).some(name => (' '+normalize(name)+' ').includes(' '+target+' ')));
+  return matches.length === 1 ? matches[0] : undefined;
+}
 async function refreshPersonal(keepDraft) {
   const state = (await callTool('read_personal_context',{})).structuredContent;
   if (!state.account) { render({accountOnly:true,account:null}); return; }
@@ -207,7 +218,11 @@ async function refreshPersonal(keepDraft) {
   else dirty = true;
   showIdentity(state.account);
   finished = false;
-  render({...state,connection_ref:state.account.ref,notes:''});
+  const suggestion = pendingSuggestion ?? {};
+  const projectMatch = matchAssignment(state.projects,suggestion.project_hint,p => [p.name,p.client,p.client+' '+p.name]);
+  const taskMatch = matchAssignment(projectMatch?.tasks ?? [],suggestion.task_hint,t => [t.name]);
+  render({...state,connection_ref:state.account.ref,project_id:projectMatch?.id,task_id:taskMatch?.id,notes:suggestion.notes});
+  pendingSuggestion = undefined;
   lock(false);
 }
 el('connectForm').onsubmit = async event => {
@@ -276,7 +291,7 @@ window.addEventListener('message', e => {
 });
 setInterval(drawTime,30000);
 try {
-  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.2.0'},appCapabilities:{},protocolVersion:'2026-01-26'});
+  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.2.1'},appCapabilities:{},protocolVersion:'2026-01-26'});
   updateHostTheme(host.hostContext);
   post({method:'ui/notifications/initialized',params:{}});
   new ResizeObserver(() => post({method:'ui/notifications/size-changed',params:{height:Math.ceil(document.body.getBoundingClientRect().height)}})).observe(document.body);

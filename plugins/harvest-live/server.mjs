@@ -6,7 +6,7 @@ import { days, readSchedule, saveSchedule } from './schedule.mjs';
 import { currentAccount, credential, checkAccount, wrappingKey, unwrap, saveAccount, forgetAccount, withAccountLock } from './account.mjs';
 import { harvest, listAccounts } from './harvest-api.mjs';
 
-const uri = 'ui://harvest-live/timer-v3.html';
+const uri = 'ui://harvest-live/timer-v4.html';
 const mimeType = 'text/html;profile=mcp-app';
 const id = { type: 'integer', minimum: 1 };
 const label = { type: 'string', maxLength: 1000 };
@@ -14,7 +14,12 @@ const notes = { type: 'string', maxLength: 4000 };
 const record = (properties, required) => ({ type: 'object', properties, required, additionalProperties: false });
 const ref = {type:'string',maxLength:36};
 const expected = {anyOf:[ref,{type:'null'}]};
-const inputSchema = record({connection_ref:ref,project_id:id,task_id:id,notes},[]);
+const suggestion = {
+  notes: {...notes,description:'Short action-oriented description of the work from the opening request, including its ticket ID if present.'},
+  project_hint: {...label,description:'Likely project or client name inferred from the request or repository before assignments can be read.'},
+  task_hint: {...label,description:'Likely Harvest task name or discipline, for example Design or Web.'}
+};
+const inputSchema = record({connection_ref:ref,project_id:id,task_id:id,...suggestion},[]);
 
 const tool = {
   name: 'show_timer', title: 'Harvest Live', description: 'Open the timer with data from this plugin’s connected personal account, or display token setup on first use. Read-only. Use the harvest-live skill to handle a submitted choice.',
@@ -49,7 +54,7 @@ function valid(schema, value) {
   }
 }
 
-const accountView = {...settings,name:'show_account',title:'Harvest account',description:'Open the private personal access token form. Can be used before connecting to Harvest.'};
+const accountView = {...settings,name:'show_account',title:'Harvest account',inputSchema:record(suggestion,[]),description:'Open the private personal access token form. For onboarding from a work request, supply notes and likely project/task names for the first timer draft.'};
 const contextTool = {...settings,name:'read_personal_context',title:'Read personal Harvest account',
   description:'Check for a configured personal account and read its own project assignments and running timer. If unset, open show_account.',_meta:{}};
 function privateTool(name, properties, readOnlyHint = false) {
@@ -69,13 +74,15 @@ async function personal(name,args) {
     const account = currentAccount();
     let schedule;
     try { schedule = readSchedule(); } catch { /* Settings can be repaired separately. */ }
-    return {...result({accountOnly:true,account}),_meta:{account,tokenStorage,schedule}};
+    const {notes,project_hint,task_hint} = args;
+    return {...result({accountOnly:true,account,suggestion:{notes,project_hint,task_hint}}),_meta:{account,tokenStorage,schedule}};
   }
   if (name === contextTool.name) {
     const account = currentAccount();
     if (!account) return result({account:null},'No personal token configured.');
     const data = await harvest(account,credential(account)).context();
-    return result({account,...data},'Personal Harvest assignments and running timer retrieved.');
+    const state = {account,...data};
+    return result(state,JSON.stringify(state));
   }
   if (name === 'get_token_key') return {content:[],_meta:{key:wrappingKey()}};
   return withAccountLock(async () => {
@@ -101,14 +108,14 @@ async function dispatch(method, params = {}) {
   switch (method) {
     case 'initialize': return {
       protocolVersion: ['2024-11-05','2025-03-26','2025-06-18','2025-11-25'].includes(params.protocolVersion) ? params.protocolVersion : '2025-11-25',
-      capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'harvest-live', version: '0.2.0' }
+      capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'harvest-live', version: '0.2.1' }
     };
     case 'ping': return {};
     case 'tools/list': return { tools: [tool, settings, save, ...personalTools] };
     case 'resources/templates/list': return { resourceTemplates: [] };
     case 'resources/list': return { resources: [resource] };
     case 'resources/read':
-      if (params.uri !== uri && !['ui://harvest-live/timer-v1.html','ui://harvest-live/timer-v2.html'].includes(params.uri)) break;
+      if (params.uri !== uri && !['ui://harvest-live/timer-v1.html','ui://harvest-live/timer-v2.html','ui://harvest-live/timer-v3.html'].includes(params.uri)) break;
       return { contents: [{ ...resource, uri: params.uri, text: readFileSync(new URL('./timer.html', import.meta.url), 'utf8') }] };
     case 'tools/call': {
       const operation = personalTools.find(t=>t.name===params.name);
@@ -134,13 +141,14 @@ async function dispatch(method, params = {}) {
       if (params.name !== tool.name || !valid(inputSchema, params.arguments ?? {})) break;
       const account = currentAccount();
       const draft = params.arguments ?? {};
-      if (!account || (draft.connection_ref && account.ref !== draft.connection_ref)) return personal(accountView.name,{});
+      if (!account) return personal(accountView.name,draft);
+      if (draft.connection_ref && account.ref !== draft.connection_ref) return personal(accountView.name,{});
       try {
         const fresh = await harvest(account,credential(account)).context();
         return {content:[{type:'text',text:'Personal Harvest timer ready for review.'}],
           structuredContent:{...draft,...fresh,notes:draft.notes ?? '',connection_ref:account.ref},_meta:{schedule:readSchedule(),account,tokenStorage}};
       } catch (error) {
-        const result = await personal(accountView.name,{});
+        const result = await personal(accountView.name,draft);
         result.structuredContent.connectionError = error.message;
         return result;
       }

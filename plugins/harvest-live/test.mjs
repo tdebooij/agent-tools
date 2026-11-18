@@ -14,7 +14,7 @@ function run(script, lines, directory) {
 }
 test('discovery and first-use timer opening work without a token or Harvest connector', () => {
   const [init,list,read,firstUse] = run('server.mjs', [
-    ['initialize',{protocolVersion:'2025-11-25'}], ['tools/list'], ['resources/read',{uri:'ui://harvest-live/timer-v3.html'}],
+    ['initialize',{protocolVersion:'2025-11-25'}], ['tools/list'], ['resources/read',{uri:'ui://harvest-live/timer-v4.html'}],
     ['tools/call',{name:'show_timer',arguments:{}}]
   ].map(([method,params],id)=>({jsonrpc:'2.0',id,method,params})));
   assert.equal(init.result.protocolVersion,'2025-11-25');
@@ -64,5 +64,14 @@ test('schedule saves across processes and hook suppresses fallback and duplicate
     assert.equal(prompt('b','next').length,0);
   } finally {
     rmSync(dir,{recursive:true,force:true});
+  }
+});
+
+test('both first-use entry points carry a work suggestion through account setup without carrying assignment IDs', () => {
+  const suggestion = {notes:'Review checkout #127',project_hint:'Storefront',task_hint:'Design'};
+  for (const name of ['show_account','show_timer']) {
+    const args = name === 'show_timer' ? {...suggestion,project_id:42,task_id:7} : suggestion;
+    const [reply] = run('server.mjs',[{id:1,jsonrpc:'2.0',method:'tools/call',params:{name,arguments:args}}]);
+    assert.deepEqual(reply.result.structuredContent,{accountOnly:true,account:null,suggestion});
   }
 });
