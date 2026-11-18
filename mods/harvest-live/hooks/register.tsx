@@ -454,14 +454,22 @@ export const register: Register = (on, options) => {
     return ran
   })
 
-  // First prompt of a session, and the first one on a later day (a resumed chat), within the working hours set, unless --no-harvest.
+  // First prompt of a session, and the first one on a later day (a resumed chat), within the working hours set.
   // Opens the panel and pre-fills in the background, never waits.
   on('prompt.submit', async ($, e, next) => {
     const now = new Date(await $.clock.now())
     const isWork = isWorkTime(now)
     const today = now.toDateString()
     const { value: lastDay = '' } = await $.state.get(day)
-    if (isWork && lastDay !== today && !e.text.includes('--no-harvest')) {
+    // --no-harvest anywhere in a prompt: no band for the rest of this chat today, and the flag doesn't reach Claude.
+    if (/(^|\s)--no-harvest(?=\s|$)/.test(e.text)) {
+      await $.state.set(day, today)
+      await $.state.set(isOpen, false)
+      // Only the flag and the spaces before it go: line breaks in the prompt stay.
+      const text = e.text.replace(/[ \t]*(^|(?<=\s))--no-harvest(?=\s|$)/gm, '').trim()
+      return next({ ...e, text: text || e.text })
+    }
+    if (isWork && lastDay !== today) {
       await $.state.set(day, today)
       await $.state.set(isOpen, true)
       if (!creds.token) return next(e)
