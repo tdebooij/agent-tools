@@ -49,3 +49,21 @@ for (const mode of ['switch','stale','wrong assignment','stop fails','start fail
     assert.deepEqual(writes,mode==='switch'||mode==='start fails'?['PATCH','POST']:mode==='stop fails'?['PATCH']:[]);
   });
 }
+
+test('summary reads the selected entry and checks its owner and duration', async () => {
+  const entry = {id:7,user:{id:11},client:{name:'Studio'},project:{name:'Website'},task:{name:'Design'},
+    notes:'Review checkout',is_running:false,hours:1.25};
+  const client = harvest({accountId:21,userId:11},'fixture',async (url,init) => {
+    assert.equal(new URL(url).pathname,'/v2/time_entries/7');
+    assert.equal(init.method,'GET');
+    return Response.json(entry);
+  });
+  assert.equal((await client.entry(7)).seconds,4500);
+  Object.assign(entry,{is_running:true,hours_without_timer:1,timer_started_at:new Date(Date.now()-60000).toISOString()});
+  const running = await client.entry(7);
+  assert.ok(running.seconds >= 3660 && running.seconds < 3665);
+  entry.user.id = 12;
+  await assert.rejects(client.entry(7),/unexpected entry/);
+  entry.id = 8;
+  await assert.rejects(client.entry(7),/different entry/);
+});

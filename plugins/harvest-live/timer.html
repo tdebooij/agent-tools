@@ -13,6 +13,10 @@ button{cursor:pointer;font:600 .92rem system-ui;color:var(--ink);background:tran
 .actions{justify-content:flex-end;flex-wrap:wrap;margin-top:18px}.subtle{font-size:.87rem;margin:8px 0 0}.subtle:empty{display:none}#status{margin-bottom:0}fieldset{border:0;margin:0;padding:0;min-width:0}legend{position:absolute;clip-path:inset(50%)}[hidden]{display:none!important}
 @media(max-width:440px){.fields{grid-template-columns:1fr}.actions button{flex:1}.snapshot{align-items:flex-start}.elapsed{font-size:.82rem}}
 a{color:var(--accent)}details{border-top:1px solid var(--line);margin-top:16px;padding-top:6px}summary{cursor:pointer;font-size:.88rem;color:var(--muted);padding:10px 0}.schedule{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}@media(max-width:440px){.schedule{grid-template-columns:1fr 1fr}.schedule>div:first-child{grid-column:1/-1}}
+main:has(#entryCard:not([hidden])){padding:8px 14px}
+#entryCard{border:0;margin:0;padding:0}#entryCard>summary{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:0 10px;align-items:center;min-height:44px;padding:4px 0;color:var(--ink);font-size:1rem}
+#entryCard>summary::-webkit-details-marker{display:none}#entryCard>summary::after{content:'›';font-size:1.2rem;color:var(--muted);grid-column:3;grid-row:1/3}#entryCard[open]>summary::after{transform:rotate(90deg)}
+#entryProject,#entryNotes{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;grid-column:1}#entryNotes{grid-row:2;color:var(--muted);font-size:.9rem}#entryBadge{grid-column:2;grid-row:1/3;color:var(--muted);font-size:.81rem;font-variant-numeric:tabular-nums}#entryFull{overflow-wrap:anywhere}
 </style>
 <style id="dark-palette" media="(prefers-color-scheme: dark)">
 :root{--surface:#201e1b;--ink:#f6efe4;--muted:#c4baad;--line:#81786b;--wash:#302c26;--accent:#ffac80;--on:#32150a;--live:#9ed5a7}
@@ -36,6 +40,11 @@ try {
 } catch { /* Embedded views can have storage disabled. */ }
 applyTheme();
 </script></head><body><main>
+<details id="entryCard" hidden>
+<summary id="entryToggle"><strong id="entryProject"></strong><span id="entryNotes"></span><span id="entryBadge"></span></summary>
+<p id="entryFull" class="subtle"></p><button type="button" id="openControls">Open timer controls</button>
+</details>
+<section id="editor">
 <header><div class="brand"><span class="mark" aria-hidden="true"><span class="clock"></span></span><h1>Harvest Live</h1></div><button id="refresh" type="button" hidden>Refresh</button></header>
 <div class="snapshot"><div><small id="state">Timer</small><strong id="current">Loading Harvest…</strong><small id="currentNotes"></small></div><span id="elapsed" class="elapsed" title="Time since this timer segment started"></span></div>
 <form id="form" hidden><fieldset id="fields"><legend>New time entry</legend><div class="fields">
@@ -60,7 +69,7 @@ applyTheme();
 <details><summary>Appearance</summary><label for="appearance">Theme</label>
 <select id="appearance"><option value="auto">Follow Codex</option><option value="light">Light</option><option value="dark">Dark</option></select></details>
 <p class="subtle" id="status" role="status"></p>
-</main><script type="module">
+</section></main><script type="module">
 const el = id => document.getElementById(id);
 const appearance = el('appearance');
 appearance.value = chosenTheme;
@@ -135,24 +144,74 @@ el('scheduleForm').onsubmit = async event => {
   } catch (err) { el('status').textContent = err.message; }
   finally { button.disabled = false; }
 };
+let cardKey, tracked, receivedAt, statusUnknown = false, polling = false, inView = false;
+function rememberEntry(value) {
+  if (!cardKey) return;
+  try {
+    if (value) localStorage.setItem(cardKey,JSON.stringify(value));
+    else localStorage.removeItem(cardKey);
+  } catch { /* The summary still works for this open card. */ }
+}
+function paintEntry() {
+  if (!tracked) return;
+  const e = tracked.entry;
+  el('entryProject').textContent = e.project;
+  el('entryNotes').textContent = e.notes;
+  const seconds = e.seconds;
+  const minutes = Number.isFinite(seconds) ? Math.floor((seconds + (e.is_running && !statusUnknown ? (Date.now()-receivedAt)/1000 : 0))/60) : null;
+  const duration = minutes == null ? '' : minutes === 0 ? '<1m' : minutes < 60 ? minutes+'m' : Math.floor(minutes/60)+'h '+minutes%60+'m';
+  el('entryBadge').textContent = statusUnknown ? 'Status unavailable' : [e.is_running ? 'Running' : 'Stopped',duration].filter(Boolean).join(' · ');
+  el('entryBadge').classList.toggle('live',!statusUnknown && e.is_running);
+  el('entryFull').textContent = [e.project,e.task,e.notes].filter(Boolean).join(' · ');
+}
+function displayEntry(receipt, unknown = false) {
+  tracked = receipt; receivedAt = Date.now(); statusUnknown = unknown;
+  el('editor').hidden = true; el('entryCard').hidden = false;
+  paintEntry();
+}
+async function checkEntry() {
+  if (!tracked || polling || document.hidden || !inView) return;
+  polling = true;
+  const receipt = tracked;
+  try {
+    const result = await callTool('read_personal_entry',{connection_ref:receipt.ref,entry_id:receipt.entry.id});
+    if (tracked === receipt) displayEntry({ref:receipt.ref,entry:result.structuredContent.entry});
+  } catch { if (tracked === receipt) { statusUnknown = true; paintEntry(); } }
+  finally { polling = false; }
+}
+new IntersectionObserver(([record]) => {
+  inView = record.isIntersecting;
+  if (inView) checkEntry();
+}).observe(el('entryCard'));
+document.addEventListener('visibilitychange',checkEntry);
+setInterval(checkEntry,60000);
 function render(next, meta = {}) {
   const schedule = meta.schedule;
   if (Object.hasOwn(meta,'account')) showIdentity(meta.account);
   if (meta.tokenStorage) el('tokenHint').textContent = 'Saved for you in '+meta.tokenStorage+'.';
+  if (schedule || next?.settingsOnly) {
+    el('settings').hidden = false;
+    const values = schedule ?? next.schedule ?? {days:'weekdays',start:'09:00',end:'18:00'};
+    if (!scheduleEdited) for (const k of ['days','start','end']) el(k).value = values[k];
+  }
+  if (meta.cardId && !cardKey) {
+    cardKey = 'harvest-live.entry.'+meta.cardId;
+    try {
+      const saved = JSON.parse(localStorage.getItem(cardKey));
+      if (Number.isSafeInteger(saved?.entry?.id) && typeof saved.ref === 'string') {
+        displayEntry(saved,true);
+        return;
+      }
+    } catch { /* This card has no saved summary. */ }
+  }
+  if (tracked) return;
   if (next?.accountOnly) {
     resetTimer();
     pendingSuggestion = next.suggestion;
     showIdentity(next.account);
     el('accountPanel').open = true;
     el('status').textContent = next.connectionError ?? '';
-    if (schedule) el('settings').hidden = false;
-    if (schedule) for (const k of ['days','start','end']) el(k).value = schedule[k];
     return;
-  }
-  if (schedule || next?.settingsOnly) {
-    el('settings').hidden = false;
-    const values = schedule ?? next.schedule ?? {days:'weekdays',start:'09:00',end:'18:00'};
-    if (!scheduleEdited) for (const k of ['days','start','end']) el(k).value = values[k];
   }
   if (next?.settingsOnly) {
     document.querySelector('.snapshot').hidden = true;
@@ -193,7 +252,7 @@ function resetTimer() {
 }
 async function callTool(name,args) {
   const result = await request('tools/call',{name,arguments:args});
-  if (result.isError) throw new Error(result.content?.[0]?.text || 'The request failed.');
+  if (result.isError) throw Object.assign(new Error(result.content?.[0]?.text || 'The request failed.'),{reason:result._meta?.reason});
   return result;
 }
 function clearSecret() {
@@ -266,14 +325,28 @@ el('form').onsubmit = async event => {
   try {
     const choice = {connection_ref:data.connection_ref,expected_running_id:data.running?.id ?? null,project_id:Number(project.value),task_id:Number(task.value),notes:notes.value};
     const result = await callTool('start_personal_timer',choice);
-    dirty = false;
-    render({...data,running:result.structuredContent.running,notes:notes.value});
-    finished = true; el('form').hidden = true; el('refresh').disabled = false;
-    el('status').textContent = 'Harvest confirmed your new timer.';
+    finished = true;
+    const receipt = {ref:choice.connection_ref,entry:result.structuredContent.running};
+    displayEntry(receipt); rememberEntry(receipt); el('entryToggle').focus();
   } catch (err) {
     // A timeout can follow a successful write. Require fresh data before another submission.
-    finished = true; el('refresh').disabled = false; el('status').textContent = err.message+' Refresh to review the current timer.';
+    finished = true; el('refresh').disabled = false; el('status').textContent = err.message;
+    if (err.reason === 'timer_changed') {
+      try { await refreshPersonal(true); } catch (refreshError) { el('status').textContent = refreshError.message; }
+    }
   }
+};
+el('openControls').onclick = async () => {
+  el('openControls').disabled = true;
+  const receipt = tracked;
+  tracked = null;
+  try {
+    await refreshPersonal(false);
+    rememberEntry(null); el('entryCard').open = false; el('entryCard').hidden = true; el('editor').hidden = false;
+    el('status').textContent = ''; (el('form').hidden ? el('token') : project).focus();
+  } catch (err) {
+    displayEntry(receipt,true); el('entryFull').textContent = err.message;
+  } finally { el('openControls').disabled = false; }
 };
 el('refresh').onclick = async () => {
   lock(true);
@@ -289,9 +362,9 @@ window.addEventListener('message', e => {
   else if (msg.method === 'ui/notifications/tool-result') render(msg.params.structuredContent,msg.params._meta);
   else if (msg.method === 'ui/resource-teardown') post({id:msg.id,result:{}});
 });
-setInterval(drawTime,30000);
+setInterval(() => { drawTime(); paintEntry(); },15000);
 try {
-  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.2.1'},appCapabilities:{},protocolVersion:'2026-01-26'});
+  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.2.2'},appCapabilities:{},protocolVersion:'2026-01-26'});
   updateHostTheme(host.hostContext);
   post({method:'ui/notifications/initialized',params:{}});
   new ResizeObserver(() => post({method:'ui/notifications/size-changed',params:{height:Math.ceil(document.body.getBoundingClientRect().height)}})).observe(document.body);

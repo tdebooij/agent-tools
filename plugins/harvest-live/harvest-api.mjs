@@ -46,20 +46,34 @@ export function harvest(account, token, fetchImpl = fetch) {
     }
     return list;
   }
+  function summary(e) {
+    if (e.user?.id !== account.userId || !Number.isSafeInteger(e.id) || typeof e.is_running !== 'boolean') throw new Error('Harvest returned an unexpected entry.');
+    const start = Date.parse(e.timer_started_at);
+    const seconds = e.is_running && Number.isFinite(start) && Number.isFinite(e.hours_without_timer)
+      ? e.hours_without_timer * 3600 + Math.max(0,(Date.now()-start)/1000)
+      : Number.isFinite(e.hours) ? e.hours * 3600 : null;
+    return {id:e.id,project:e.project.name,task:e.task.name,client:e.client.name,notes:e.notes || '',
+      is_running:e.is_running,seconds,started_at:e.timer_started_at};
+  }
+  async function entry(id) {
+    const e = await api('time_entries/'+id);
+    if (e.id !== id) throw new Error('Harvest returned a different entry.');
+    return summary(e);
+  }
   async function running() {
     const {time_entries:entries} = await api('time_entries?is_running=true&user_id='+account.userId+'&per_page=2');
     if (!Array.isArray(entries) || entries.length > 1) throw new Error('Could not identify a single running timer. Review it in Harvest.');
     if (!entries.length) return null;
     const [e] = entries;
-    if (e.user.id !== account.userId || e.is_running !== true || !Number.isSafeInteger(e.id)) throw new Error('Harvest returned an unexpected timer.');
-    return {id:e.id,project:e.project.name,task:e.task.name,client:e.client.name,notes:e.notes || '',...(e.timer_started_at && {started_at:e.timer_started_at})};
+    if (e.is_running !== true) throw new Error('Harvest returned an unexpected timer.');
+    return summary(e);
   }
   async function start(choice) {
     const assigned = await projects();
     if (!assigned.find(p=>p.id===choice.project_id)?.tasks.some(t=>t.id===choice.task_id)) throw new Error('This project and task are no longer assigned. Refresh the card.');
     const company = await api('company');
     const current = await running();
-    if ((current?.id ?? null) !== choice.expected_running_id) throw new Error('The running timer changed. Refresh the card and review it.');
+    if ((current?.id ?? null) !== choice.expected_running_id) throw Object.assign(new Error('The running timer changed. Review it before switching.'),{reason:'timer_changed'});
     if (current) {
       const stopped = await api('time_entries/'+current.id+'/stop','PATCH');
       if (stopped.id !== current.id || stopped.is_running !== false) throw new Error('Harvest did not confirm the stop. Refresh the card.');
@@ -72,8 +86,8 @@ export function harvest(account, token, fetchImpl = fetch) {
         ...(company.wants_timestamp_timers && {started_time:pad(now.getHours())+':'+pad(now.getMinutes())})});
       if (!created.is_running || created.user?.id !== account.userId || created.project?.id !== choice.project_id || created.task?.id !== choice.task_id)
         throw new Error('Harvest did not confirm the new timer. Refresh the card.');
-      return {id:created.id,project:created.project.name,task:created.task.name,client:created.client.name,notes:created.notes,started_at:created.timer_started_at};
+      return summary(created);
     } catch (error) { if (current) throw new Error('The previous timer was stopped. '+error.message); throw error; }
   }
-  return {me:()=>api('users/me'), async context(){const [list,timer]=await Promise.all([projects(),running()]);return {projects:list,running:timer};}, start};
+  return {me:()=>api('users/me'), async context(){const [list,timer]=await Promise.all([projects(),running()]);return {projects:list,running:timer};}, entry, start};
 }

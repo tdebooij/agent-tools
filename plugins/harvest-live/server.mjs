@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 
@@ -6,7 +7,7 @@ import { days, readSchedule, saveSchedule } from './schedule.mjs';
 import { currentAccount, credential, checkAccount, wrappingKey, unwrap, saveAccount, forgetAccount, withAccountLock } from './account.mjs';
 import { harvest, listAccounts } from './harvest-api.mjs';
 
-const uri = 'ui://harvest-live/timer-v4.html';
+const uri = 'ui://harvest-live/timer-v5.html';
 const mimeType = 'text/html;profile=mcp-app';
 const id = { type: 'integer', minimum: 1 };
 const label = { type: 'string', maxLength: 1000 };
@@ -64,6 +65,7 @@ const actions = [
   privateTool('get_token_key',{},true),
   privateTool('connect_account',{account_id:{anyOf:[id,{type:'null'}]},encrypted_token:{type:'string',maxLength:512},expected_ref:expected}),
   privateTool('disconnect_account',{expected_ref:ref}),
+  privateTool('read_personal_entry',{connection_ref:ref,entry_id:id},true),
   privateTool('start_personal_timer',{connection_ref:ref,project_id:id,task_id:id,expected_running_id:{anyOf:[id,{type:'null'}]},notes})
 ];
 const personalTools = [accountView,contextTool,...actions];
@@ -85,6 +87,10 @@ async function personal(name,args) {
     return result(state,JSON.stringify(state));
   }
   if (name === 'get_token_key') return {content:[],_meta:{key:wrappingKey()}};
+  if (name === 'read_personal_entry') {
+    const account = checkAccount(args.connection_ref);
+    return result({entry:await harvest(account,credential(account)).entry(args.entry_id)},'Harvest entry status retrieved.');
+  }
   return withAccountLock(async () => {
     if (name === 'connect_account') {
       checkAccount(args.expected_ref);
@@ -108,21 +114,21 @@ async function dispatch(method, params = {}) {
   switch (method) {
     case 'initialize': return {
       protocolVersion: ['2024-11-05','2025-03-26','2025-06-18','2025-11-25'].includes(params.protocolVersion) ? params.protocolVersion : '2025-11-25',
-      capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'harvest-live', version: '0.2.1' }
+      capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'harvest-live', version: '0.2.2' }
     };
     case 'ping': return {};
     case 'tools/list': return { tools: [tool, settings, save, ...personalTools] };
     case 'resources/templates/list': return { resourceTemplates: [] };
     case 'resources/list': return { resources: [resource] };
     case 'resources/read':
-      if (params.uri !== uri && !['ui://harvest-live/timer-v1.html','ui://harvest-live/timer-v2.html','ui://harvest-live/timer-v3.html'].includes(params.uri)) break;
+      if (params.uri !== uri && !['ui://harvest-live/timer-v1.html','ui://harvest-live/timer-v2.html','ui://harvest-live/timer-v3.html','ui://harvest-live/timer-v4.html'].includes(params.uri)) break;
       return { contents: [{ ...resource, uri: params.uri, text: readFileSync(new URL('./timer.html', import.meta.url), 'utf8') }] };
     case 'tools/call': {
       const operation = personalTools.find(t=>t.name===params.name);
       if (operation) {
         if (!valid(operation.inputSchema,params.arguments ?? {})) break;
         try { return await personal(params.name,params.arguments ?? {}); }
-        catch (error) { return {isError:true,content:[{type:'text',text:error.code ? 'Unable to access local account settings.' : error.message}]}; }
+        catch (error) { return {isError:true,_meta:{reason:error.reason},content:[{type:'text',text:error.code ? 'Unable to access local account settings.' : error.message}]}; }
       }
       if (params.name === settings.name) {
         let schedule;
@@ -165,6 +171,9 @@ for await (const line of createInterface({ input: process.stdin })) {
     if (request?.jsonrpc !== '2.0' || typeof request.method !== 'string') throw { code: -32600, message: 'Invalid request' };
     if (!Object.hasOwn(request, 'id')) continue;
     const result = await dispatch(request.method, request.params);
+    if (request.method === 'tools/call' && [tool.name,accountView.name,settings.name].includes(request.params?.name) && !result.isError) {
+      result._meta = {...result._meta,cardId:randomUUID()};
+    }
     console.log(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }));
   } catch (error) {
     const fallback = error instanceof SyntaxError ? { code: -32700, message: 'Invalid JSON' } : { code: -32603, message: 'Unable to load timer' };

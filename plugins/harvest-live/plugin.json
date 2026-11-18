@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "harvest-live",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Review and confirm a Harvest time entry in Codex using your own Harvest personal access token.",
   "author": {
     "name": "Tim de Booij"

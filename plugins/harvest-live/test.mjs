@@ -14,7 +14,7 @@ function run(script, lines, directory) {
 }
 test('discovery and first-use timer opening work without a token or Harvest connector', () => {
   const [init,list,read,firstUse] = run('server.mjs', [
-    ['initialize',{protocolVersion:'2025-11-25'}], ['tools/list'], ['resources/read',{uri:'ui://harvest-live/timer-v4.html'}],
+    ['initialize',{protocolVersion:'2025-11-25'}], ['tools/list'], ['resources/read',{uri:'ui://harvest-live/timer-v5.html'}],
     ['tools/call',{name:'show_timer',arguments:{}}]
   ].map(([method,params],id)=>({jsonrpc:'2.0',id,method,params})));
   assert.equal(init.result.protocolVersion,'2025-11-25');

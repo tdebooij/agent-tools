@@ -29,7 +29,7 @@ The default is Monday to Friday, 09:00 inclusive to 18:00 exclusive, in the loca
 
 ## How the card works
 
-Codex uses the plugin’s read-only context tool to suggest a project and task from your own assignments. The timer card fetches current data and handles Start, Switch and Refresh directly. Before a switch, the plugin checks the account, project/task assignment and running entry again. A stale proposal requires review. Harvest confirms the new entry before the card reports success. Dismiss makes no time-entry changes.
+Codex uses the plugin’s read-only context tool to suggest a project and task from your own assignments. The timer card fetches current data and handles Start, Switch and Refresh directly. Before a switch, the plugin checks the account, project/task assignment and running entry again. A stale proposal requires review. Once Harvest confirms Start or Switch, the card collapses to the project, description, status and elapsed time. While visible, it checks that entry once a minute, including after another timer starts. A stopped entry shows its recorded duration. Expand the summary to read long descriptions or reopen the controls. When local storage is available, the card remembers the entry when you return to the chat. Dismiss makes no time-entry changes.
 
 Concurrent writes from different chats use a per-user lock. If a server is forcibly terminated mid-operation, check the timer in Harvest and confirm the process ID in `account-operation.lock` is no longer running before removing that file from the Harvest Live config directory.
 
