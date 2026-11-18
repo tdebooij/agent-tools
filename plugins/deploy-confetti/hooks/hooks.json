@@ -5,7 +5,7 @@
         "type": "command",
         "command": "python3 \"${PLUGIN_ROOT}/deploy_confetti.py\"",
         "timeout": 3,
-        "statusMessage": "Load Deploy Confetti"
+        "statusMessage": "Deploy Confetti"
       }]
     }]
   }

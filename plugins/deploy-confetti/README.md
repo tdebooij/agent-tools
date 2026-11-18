@@ -11,7 +11,7 @@ codex plugin marketplace add tdebooij/agent-tools
 codex plugin add deploy-confetti@agent-tools
 ```
 
-Review and trust **Load Deploy Confetti** in the Codex CLI’s `/hooks` menu. In your personal Codex instructions, give the desktop tool permission to celebrate future releases, for example:
+Review and trust **Deploy Confetti** in the Codex CLI’s `/hooks` menu. In your personal Codex instructions, give the desktop tool permission to celebrate future releases, for example:
 
 > When a release you merge or follow is confirmed live in production, fire confetti once. Choose emoji for that release or use the default confetti.
 
