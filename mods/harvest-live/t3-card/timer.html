@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Harvest Live</title>
+<style>
+:root{color-scheme:light dark;--surface:#fffdf9;--ink:#29261f;--muted:#635d54;--line:#d2cabd;--wash:#f4f0e8;--accent:#9b3d13;--on:#fff;--live:#317247;font:16px/1.45 "Inter",system-ui,sans-serif}
+
+*{box-sizing:border-box}body{min-height:1px;margin:0;color:var(--ink);background:var(--surface)}main{max-width:48rem;margin:auto;padding:clamp(16px,4vw,28px)}
+header,.actions,.snapshot,.brand{display:flex;align-items:center;gap:12px}header,.snapshot{justify-content:space-between}
+.brand{gap:10px}h1{font-size:1.24rem;letter-spacing:-.035em;margin:0}.mark{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;color:var(--on);background:var(--accent)}
+.clock{width:18px;height:18px;border:2px solid currentColor;border-radius:50%;position:relative}.clock:after{content:"";position:absolute;top:2px;left:6px;height:5px;width:4px;border:solid currentColor;border-width:0 0 2px 2px}
+.snapshot{margin:18px 0;padding:13px 15px;background:var(--wash);border-radius:10px;overflow-wrap:anywhere}.snapshot strong,.snapshot small{display:block}.snapshot small,.subtle,label{color:var(--muted)}.snapshot strong{font-weight:600}.live:before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--live);margin-right:7px}.elapsed{font:600 .96rem ui-monospace,monospace;white-space:nowrap}
+.fields{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px}label{display:block;font-size:.84rem;font-weight:600}.wide{grid-column:1/-1}select,input{margin-top:5px;width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:7px;padding:9px 10px;font:inherit;font-size:1rem;min-height:44px}
+button{cursor:pointer;font:600 .92rem system-ui;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:9px 14px;min-height:44px}.primary{background:var(--accent);border-color:var(--accent);color:var(--on)}button:disabled{opacity:.55;cursor:default}button:hover:enabled{filter:brightness(.94)}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.actions{justify-content:flex-end;flex-wrap:wrap;margin-top:18px}.subtle{font-size:.87rem;margin:8px 0 0}.subtle:empty{display:none}#status{margin-bottom:0}fieldset{border:0;margin:0;padding:0;min-width:0}legend{position:absolute;clip-path:inset(50%)}[hidden]{display:none!important}
+@media(max-width:440px){.fields{grid-template-columns:1fr}.actions button{flex:1}.snapshot{align-items:flex-start}.elapsed{font-size:.82rem}}
+a{color:var(--accent)}details{border-top:1px solid var(--line);margin-top:16px;padding-top:6px}summary{cursor:pointer;font-size:.88rem;color:var(--muted);padding:10px 0}.schedule{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}@media(max-width:440px){.schedule{grid-template-columns:1fr 1fr}.schedule>div:first-child{grid-column:1/-1}}
+main:has(#entryCard:not([hidden])){padding:8px 14px}
+#entryCard{border:0;margin:0;padding:0}#entryCard>summary{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:0 10px;align-items:center;min-height:44px;padding:4px 0;color:var(--ink);font-size:1rem}
+#entryCard>summary::-webkit-details-marker{display:none}#entryCard>summary::after{content:'›';font-size:1.2rem;color:var(--muted);grid-column:3;grid-row:1/3}#entryCard[open]>summary::after{transform:rotate(90deg)}
+#entryProject,#entryNotes{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;grid-column:1}#entryNotes{grid-row:2;color:var(--muted);font-size:.9rem}#entryBadge{grid-column:2;grid-row:1/3;color:var(--muted);font-size:.81rem;font-variant-numeric:tabular-nums}#entryFull{overflow-wrap:anywhere}
+</style>
+<style id="dark-palette" media="(prefers-color-scheme: dark)">
+:root{--surface:#201e1b;--ink:#f6efe4;--muted:#c4baad;--line:#81786b;--wash:#302c26;--accent:#ffac80;--on:#32150a;--live:#9ed5a7}
+</style>
+<script>
+const themeKey = 'harvest-live.appearance';
+let chosenTheme = 'auto';
+let hostTheme;
+const isTheme = value => value === 'light' || value === 'dark';
+function applyTheme() {
+  const scheme = isTheme(chosenTheme) ? chosenTheme : hostTheme;
+  const supported = scheme || 'light dark';
+  document.documentElement.style.colorScheme = supported;
+  document.querySelector('meta[name="color-scheme"]').content = supported;
+  document.getElementById('dark-palette').media =
+    scheme === 'dark' ? 'all' : scheme === 'light' ? 'not all' : '(prefers-color-scheme: dark)';
+}
+try {
+  const saved = localStorage.getItem(themeKey);
+  if (isTheme(saved)) chosenTheme = saved;
+} catch { /* Embedded views can have storage disabled. */ }
+applyTheme();
+</script></head><body><main>
+<details id="entryCard" hidden>
+<summary id="entryToggle"><strong id="entryProject"></strong><span id="entryNotes"></span><span id="entryBadge"></span></summary>
+<p id="entryFull" class="subtle"></p><button type="button" id="openControls">Open timer controls</button>
+</details>
+<section id="editor">
+<header><div class="brand"><span class="mark" aria-hidden="true"><span class="clock"></span></span><h1>Harvest Live</h1></div><button id="refresh" type="button" hidden>Refresh</button></header>
+<div class="snapshot"><div><small id="state">Timer</small><strong id="current">Loading Harvest…</strong><small id="currentNotes"></small></div><span id="elapsed" class="elapsed" title="Time since this timer segment started"></span></div>
+<form id="form" hidden><fieldset id="fields"><legend>New time entry</legend><div class="fields">
+<div><label for="project">Project</label><select id="project" required></select></div><div><label for="task">Task</label><select id="task"></select></div>
+<label class="wide">Description<input id="notes" type="text" maxlength="4000" required placeholder="What are you working on?"></label></div>
+<p id="hint" class="subtle"></p><div class="actions"><button type="button" id="dismiss">Dismiss</button><button class="primary" id="submit" type="submit">Start timer</button></div></fieldset></form>
+<details id="accountPanel"><summary>Harvest account</summary>
+<p id="identity" class="subtle"></p>
+<form id="connectForm"><fieldset id="accountFields"><legend>Connect Harvest</legend>
+<p><a id="tokenLink" href="https://id.getharvest.com/developers" target="_blank" rel="noopener noreferrer">Create a personal access token on Harvest ↗</a></p>
+<label for="token">Personal access token</label>
+<input id="token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" required aria-describedby="tokenHint">
+<p class="subtle" id="tokenHint"></p>
+<div id="workspaceField" hidden><label for="workspace">Harvest account</label><select id="workspace"></select></div>
+<div class="actions"><button id="disconnect" type="button" hidden>Disconnect</button><button type="submit" id="connect" class="primary">Connect account</button></div>
+</fieldset></form></details>
+<details id="settings" hidden><summary>Working hours</summary><form id="scheduleForm"><div class="schedule">
+<div><label for="days">Working days</label><select id="days"><option value="weekdays">Monday to Friday</option><option value="mon-sat">Monday to Saturday</option><option value="every-day">Every day</option><option value="never">Never</option></select></div>
+<div><label for="start">Start</label><input id="start" type="time" required></div>
+<div><label for="end">End (24-hour)</label><input id="end" type="text" maxlength="5" placeholder="18:00" required></div></div>
+<div class="actions"><button type="submit">Save hours</button></div></form></details>
+<details><summary>Appearance</summary><label for="appearance">Theme</label>
+<select id="appearance"><option value="auto">Follow Codex</option><option value="light">Light</option><option value="dark">Dark</option></select></details>
+<p class="subtle" id="status" role="status"></p>
+</section></main><script type="module">
+const el = id => document.getElementById(id);
+const appearance = el('appearance');
+appearance.value = chosenTheme;
+appearance.onchange = () => {
+  chosenTheme = appearance.value;
+  applyTheme();
+  try {
+    if (chosenTheme === 'auto') localStorage.removeItem(themeKey);
+    else localStorage.setItem(themeKey, chosenTheme);
+  } catch { /* The choice still applies to this view. */ }
+};
+window.addEventListener('storage', event => {
+  if (event.key !== themeKey && event.key !== null) return;
+  chosenTheme = isTheme(event.newValue) ? event.newValue : 'auto';
+  appearance.value = chosenTheme;
+  applyTheme();
+});
+function updateHostTheme(context) {
+  if (!isTheme(context?.theme)) return;
+  hostTheme = context.theme;
+  applyTheme();
+}
+const project = el('project'), task = el('task'), notes = el('notes');
+let data, finished = false, dirty = false, sequence = 0;
+const pending = new Map();
+const hostOrigin = document.referrer ? new URL(document.referrer).origin : '';
+function post(message) {
+  parent.postMessage({jsonrpc:'2.0', ...message}, hostOrigin && hostOrigin !== 'null' ? hostOrigin : '*');
+}
+function request(method, params) {
+  return new Promise((resolve,reject) => {
+    const id = ++sequence;
+    const timeout = setTimeout(() => { pending.delete(id); reject(new Error('Host did not reply')); }, method === 'tools/call' ? 90000 : 12000);
+    pending.set(id, result => { clearTimeout(timeout); result.error ? reject(new Error(result.error.message)) : resolve(result.result); });
+    post({id,method,params});
+  });
+}
+const selected = () => data?.projects.find(p => p.id === Number(project.value));
+function fill(select, placeholder, options, value) {
+  select.replaceChildren(new Option(placeholder,''));
+  for (const o of options) select.add(new Option(o.label ?? o.name,String(o.id)));
+  select.value = [...select.options].some(o => o.value === String(value)) ? String(value) : '';
+}
+function updateTask(value) {
+  const p = selected();
+  fill(task, 'Choose a task', p?.tasks ?? [], value);
+  task.disabled = !p?.tasks?.length;
+  updateAction();
+}
+function updateAction() {
+  el('submit').textContent = data.running ? 'Switch timer' : 'Start timer';
+  el('submit').disabled = !(project.value && task.value && notes.value.trim());
+  el('hint').textContent = !data.projects.length ? 'No active projects are available for this account.' : selected()?.tasks?.length === 0 ? 'This project has no available tasks.' : data.running ? 'Switching stops the timer above and starts a separate entry.' : '';
+}
+function drawTime() {
+  const start = Date.parse(data?.running?.started_at);
+  const mins = Math.floor((Date.now()-start)/60000);
+  el('elapsed').textContent = Number.isFinite(mins) && mins >= 0 ? Math.floor(mins/60)+'h '+String(mins%60).padStart(2,'0')+'m' : '';
+}
+let scheduleEdited = false;
+el('scheduleForm').oninput = () => { scheduleEdited = true; };
+el('scheduleForm').onsubmit = async event => {
+  event.preventDefault();
+  const button = event.submitter;
+  button.disabled = true;
+  try {
+    const schedule = Object.fromEntries(['days','start','end'].map(k=>[k,el(k).value]));
+    const result = await request('tools/call',{name:'save_working_hours',arguments:schedule});
+    if (result.isError) throw new Error(result.content[0].text);
+    scheduleEdited = false;
+    el('status').textContent = 'Working hours saved for future chats.';
+  } catch (err) { el('status').textContent = err.message; }
+  finally { button.disabled = false; }
+};
+let cardKey, tracked, receivedAt, statusUnknown = false, polling = false, inView = false;
+function rememberCard(value) {
+  if (!cardKey) return;
+  try {
+    if (value) localStorage.setItem(cardKey,JSON.stringify(value));
+    else localStorage.removeItem(cardKey);
+  } catch { /* The summary still works for this open card. */ }
+}
+function paintEntry() {
+  if (!tracked) return;
+  const e = tracked.entry;
+  el('entryProject').textContent = e.project;
+  el('entryNotes').textContent = e.notes;
+  const seconds = e.seconds;
+  const minutes = Number.isFinite(seconds) ? Math.floor((seconds + (e.is_running && !statusUnknown ? (Date.now()-receivedAt)/1000 : 0))/60) : null;
+  const duration = minutes == null ? '' : minutes === 0 ? '<1m' : minutes < 60 ? minutes+'m' : Math.floor(minutes/60)+'h '+minutes%60+'m';
+  el('entryBadge').textContent = statusUnknown ? 'Status unavailable' : [e.is_running ? 'Running' : 'Stopped',duration].filter(Boolean).join(' · ');
+  el('entryBadge').classList.toggle('live',!statusUnknown && e.is_running);
+  el('entryFull').textContent = [e.project,e.task,e.notes].filter(Boolean).join(' · ');
+}
+function displayEntry(receipt, unknown = false) {
+  tracked = receipt; receivedAt = Date.now(); statusUnknown = unknown;
+  el('editor').hidden = true; el('entryCard').hidden = false;
+  paintEntry();
+}
+async function checkEntry() {
+  if (!tracked || polling || document.hidden || !inView) return;
+  polling = true;
+  const receipt = tracked;
+  try {
+    const result = await callTool('read_personal_entry',{connection_ref:receipt.ref,entry_id:receipt.entry.id});
+    if (tracked === receipt) displayEntry({ref:receipt.ref,entry:result.structuredContent.entry});
+  } catch { if (tracked === receipt) { statusUnknown = true; paintEntry(); } }
+  finally { polling = false; }
+}
+new IntersectionObserver(([record]) => {
+  inView = record.isIntersecting;
+  if (inView) checkEntry();
+}).observe(el('entryCard'));
+document.addEventListener('visibilitychange',checkEntry);
+setInterval(checkEntry,60000);
+function render(next, meta = {}) {
+  const schedule = meta.schedule;
+  if (Object.hasOwn(meta,'account')) showIdentity(meta.account);
+  if (meta.tokenStorage) el('tokenHint').textContent = 'Saved for you in '+meta.tokenStorage+'.';
+  if (schedule || next?.settingsOnly) {
+    el('settings').hidden = false;
+    const values = schedule ?? next.schedule ?? {days:'weekdays',start:'09:00',end:'18:00'};
+    if (!scheduleEdited) for (const k of ['days','start','end']) el(k).value = values[k];
+  }
+  if (meta.cardId && !cardKey) {
+    cardKey = 'harvest-live.entry.'+meta.cardId;
+    try {
+      const saved = JSON.parse(localStorage.getItem(cardKey));
+      if (saved === 'dismissed') {
+        document.querySelector('main').hidden = true;
+        return;
+      }
+      if (Number.isSafeInteger(saved?.entry?.id) && typeof saved.ref === 'string') {
+        displayEntry(saved,true);
+        return;
+      }
+    } catch { /* This card has no saved summary. */ }
+  }
+  if (tracked || document.querySelector('main').hidden) return;
+  if (next?.accountOnly) {
+    resetTimer();
+    pendingSuggestion = next.suggestion;
+    showIdentity(next.account);
+    el('accountPanel').open = true;
+    el('status').textContent = next.connectionError ?? '';
+    return;
+  }
+  if (next?.settingsOnly) {
+    document.querySelector('.snapshot').hidden = true;
+    el('settings').open = true;
+    if (next.settingsError) el('status').textContent = 'Saved settings could not be read. Select and save your working hours.';
+    return;
+  }
+  if (next?.projects && !next.connection_ref) {
+    resetTimer(); el('status').textContent = 'Open Harvest Live again to use your personal account.'; return;
+  }
+  if (!next || !Array.isArray(next.projects) || !Object.hasOwn(next,'running') || finished) return;
+  const draft = dirty ? {project_id:Number(project.value),task_id:Number(task.value),notes:notes.value} : next;
+  data = next;
+  document.querySelector('.snapshot').hidden = false;
+  const r = data.running;
+  el('state').textContent = r ? 'Running now' : 'Current timer';
+  el('state').classList.toggle('live', Boolean(r));
+  el('current').textContent = r ? [r.client,r.project,r.task].filter(Boolean).join(' / ') : 'No timer running';
+  el('currentNotes').textContent = r?.notes ?? '';
+  fill(project,'Choose a project',data.projects.map(p => ({id:p.id,label:p.client+' / '+p.name})),draft.project_id);
+  notes.value = draft.notes || ''; updateTask(draft.task_id); drawTime();
+  el('form').hidden = false; el('refresh').hidden = false;
+}
+project.onchange = () => { dirty = true; updateTask(); };
+task.onchange = notes.oninput = () => { dirty = true; updateAction(); };
+function lock(value) { el('fields').disabled = value; el('refresh').disabled = value; }
+let account = null, encryptedToken, pendingSuggestion;
+function showIdentity(value) {
+  account = value;
+  el('identity').textContent = account ? account.name+' · '+account.workspace : 'Connect your Harvest account to track time.';
+  el('disconnect').hidden = !account;
+  el('connect').textContent = account ? 'Replace token' : 'Connect account';
+}
+function resetTimer() {
+  data = undefined; dirty = false; finished = false; lock(false);
+  el('form').reset(); el('form').hidden = true; el('refresh').hidden = true;
+  document.querySelector('.snapshot').hidden = true; el('elapsed').hidden = false;
+}
+async function callTool(name,args) {
+  const result = await request('tools/call',{name,arguments:args});
+  if (result.isError) throw Object.assign(new Error(result.content?.[0]?.text || 'The request failed.'),{reason:result._meta?.reason});
+  return result;
+}
+function clearSecret() {
+  encryptedToken = undefined; el('token').value = ''; el('token').required = true;
+  el('workspace').required = false; el('workspace').replaceChildren(); el('workspaceField').hidden = true;
+}
+el('token').oninput = () => { encryptedToken = undefined; el('workspaceField').hidden = true; el('workspace').required = false; el('token').required = true; };
+// Before sign-in, Codex can suggest names but cannot know this user's assignment IDs.
+function matchAssignment(options, hint, names) {
+  const normalize = text => (text ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+  const target = normalize(hint);
+  if (!target) return;
+  const exact = options.filter(option => names(option).some(name => normalize(name) === target));
+  if (exact.length) return exact.length === 1 ? exact[0] : undefined;
+  const matches = options.filter(option => names(option).some(name => (' '+normalize(name)+' ').includes(' '+target+' ')));
+  return matches.length === 1 ? matches[0] : undefined;
+}
+async function refreshPersonal(keepDraft) {
+  const state = (await callTool('read_personal_context',{})).structuredContent;
+  if (!state.account) { render({accountOnly:true,account:null}); return; }
+  if (!keepDraft || state.account.ref !== data?.connection_ref) resetTimer();
+  else dirty = true;
+  showIdentity(state.account);
+  finished = false;
+  const suggestion = pendingSuggestion ?? {};
+  const projectMatch = matchAssignment(state.projects,suggestion.project_hint,p => [p.name,p.client,p.client+' '+p.name]);
+  const taskMatch = matchAssignment(projectMatch?.tasks ?? [],suggestion.task_hint,t => [t.name]);
+  render({...state,connection_ref:state.account.ref,project_id:projectMatch?.id,task_id:taskMatch?.id,notes:suggestion.notes});
+  pendingSuggestion = undefined;
+  lock(false);
+}
+el('connectForm').onsubmit = async event => {
+  event.preventDefault();
+  el('accountFields').disabled = true;
+  try {
+    if (!encryptedToken) {
+      const key = (await callTool('get_token_key',{}))._meta.key;
+      const publicKey = await crypto.subtle.importKey('jwk',key,{name:'RSA-OAEP',hash:'SHA-256'},false,['encrypt']);
+      const bytes = await crypto.subtle.encrypt({name:'RSA-OAEP'},publicKey,new TextEncoder().encode(el('token').value.trim()));
+      encryptedToken = btoa(String.fromCharCode(...new Uint8Array(bytes)));
+      el('token').value = ''; el('token').required = false;
+    }
+    const choice = el('workspaceField').hidden ? null : Number(el('workspace').value);
+    const response = (await callTool('connect_account',{expected_ref:account?.ref ?? null,encrypted_token:encryptedToken,account_id:choice})).structuredContent;
+    if (response.accounts) {
+      fill(el('workspace'),'Choose an account',response.accounts);
+      el('workspaceField').hidden = false; el('workspace').required = true;
+      el('status').textContent = 'Choose the account to connect.';
+      return;
+    }
+    clearSecret(); resetTimer(); showIdentity(response.account);
+    el('status').textContent = 'Account connected.'; el('accountPanel').open = false;
+    await refreshPersonal(false);
+  } catch (err) { clearSecret(); el('status').textContent = err.message; }
+  finally { el('accountFields').disabled = false; el('workspace').required = !el('workspaceField').hidden; }
+};
+el('disconnect').onclick = async () => {
+  if (!account) return;
+  el('accountFields').disabled = true;
+  try {
+    await callTool('disconnect_account',{expected_ref:account.ref});
+    clearSecret(); render({accountOnly:true,account:null}); el('status').textContent = 'Saved token removed.';
+  } catch (err) { el('status').textContent = err.message; }
+  finally { el('accountFields').disabled = false; }
+};
+el('form').onsubmit = async event => {
+  event.preventDefault();
+  if (!data || finished || el('fields').disabled || el('submit').disabled) return;
+  lock(true);
+  try {
+    const choice = {connection_ref:data.connection_ref,expected_running_id:data.running?.id ?? null,project_id:Number(project.value),task_id:Number(task.value),notes:notes.value};
+    const result = await callTool('start_personal_timer',choice);
+    finished = true;
+    const receipt = {ref:choice.connection_ref,entry:result.structuredContent.running};
+    displayEntry(receipt); rememberCard(receipt); el('entryToggle').focus();
+  } catch (err) {
+    // A timeout can follow a successful write. Require fresh data before another submission.
+    finished = true; el('refresh').disabled = false; el('status').textContent = err.message;
+    if (err.reason === 'timer_changed') {
+      try { await refreshPersonal(true); } catch (refreshError) { el('status').textContent = refreshError.message; }
+    }
+  }
+};
+el('openControls').onclick = async () => {
+  el('openControls').disabled = true;
+  const receipt = tracked;
+  tracked = null;
+  try {
+    await refreshPersonal(false);
+    rememberCard(null); el('entryCard').open = false; el('entryCard').hidden = true; el('editor').hidden = false;
+    el('status').textContent = ''; (el('form').hidden ? el('token') : project).focus();
+  } catch (err) {
+    displayEntry(receipt,true); el('entryFull').textContent = err.message;
+  } finally { el('openControls').disabled = false; }
+};
+el('refresh').onclick = async () => {
+  lock(true);
+  try { await refreshPersonal(true); el('status').textContent = 'Timer refreshed.'; }
+  catch (err) { el('status').textContent = err.message; el('refresh').disabled = false; }
+};
+el('dismiss').onclick = async () => {
+  finished = true;
+  rememberCard('dismissed');
+  document.querySelector('main').hidden = true;
+  try { await window.openai?.requestClose?.(); }
+  catch { /* Inline hosts can keep their own header. */ }
+};
+window.addEventListener('message', e => {
+  if (e.source !== parent || (hostOrigin && hostOrigin !== 'null' && e.origin !== hostOrigin) || e.data?.jsonrpc !== '2.0') return;
+  const msg = e.data;
+  if (pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
+  else if (msg.method === 'ui/notifications/host-context-changed') updateHostTheme(msg.params);
+  else if (msg.method === 'ui/notifications/tool-result') render(msg.params.structuredContent,msg.params._meta);
+  else if (msg.method === 'ui/resource-teardown') post({id:msg.id,result:{}});
+});
+setInterval(() => { drawTime(); paintEntry(); },15000);
+try {
+  const host = await request('ui/initialize',{appInfo:{name:'harvest-live',version:'0.2.5'},appCapabilities:{},protocolVersion:'2026-01-26'});
+  updateHostTheme(host.hostContext);
+  post({method:'ui/notifications/initialized',params:{}});
+  new ResizeObserver(() => post({method:'ui/notifications/size-changed',params:{height:Math.ceil(document.body.getBoundingClientRect().height)}})).observe(document.body);
+  if (host.hostCapabilities?.openLinks) el('tokenLink').onclick = async event => {
+    event.preventDefault();
+    try { await request('ui/open-link',{url:el('tokenLink').href}); }
+    catch { el('status').textContent = 'Open id.getharvest.com/developers to create a personal access token.'; }
+  };
+} catch { el('current').textContent = 'Open Harvest Live from Codex desktop.'; }
+</script></body></html>

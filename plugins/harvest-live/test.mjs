@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-function run(script, lines, directory, now) {
+function run(script, lines, directory, now, extraEnv = {}) {
   const temporary = directory ?? mkdtempSync(join(tmpdir(),'harvest-check-'));
   const clock = now ? ['--import','data:text/javascript,'+encodeURIComponent(
     'globalThis.Date = class extends Date { constructor(...args) { super(...(args.length ? args : ['+now.getTime()+'])); } }'
   )] : [];
   const result = spawnSync(process.execPath, [...clock,fileURLToPath(new URL(script, import.meta.url))], {
-    env: {...process.env,XDG_CONFIG_HOME:temporary,PLUGIN_DATA:temporary}, input: lines.map(line => JSON.stringify(line)).join('\n')+'\n', encoding: 'utf8'
+    env: {...process.env,XDG_CONFIG_HOME:temporary,PLUGIN_DATA:temporary,...extraEnv}, input: lines.map(line => JSON.stringify(line)).join('\n')+'\n', encoding: 'utf8'
   });
   if (!directory) rmSync(temporary,{recursive:true,force:true});
   assert.equal(result.status, 0, result.stderr);
@@ -25,6 +25,16 @@ test('discovery and first-use timer opening work without a token or Harvest conn
   assert.equal(read.result.contents[0]._meta['openai/widgetMinFrameHeight'],1);
   assert.match(read.result.contents[0].text,/id="token"/);
   assert.equal(firstUse.result.structuredContent.accountOnly,true);
+});
+test('a host can limit the card to one Claude Code entrypoint', () => {
+  const lines = [['tools/list'],['resources/list'],['tools/call',{name:'show_timer',arguments:{}}]].map(([method,params],id)=>({jsonrpc:'2.0',id,method,params}));
+  const only = {HARVEST_LIVE_ONLY_ENTRYPOINT:'t3-code'};
+  const [tools,resources,call] = run('server.mjs',lines,undefined,undefined,{...only,CLAUDE_CODE_ENTRYPOINT:'claude-desktop'});
+  assert.deepEqual(tools.result.tools,[]);
+  assert.deepEqual(resources.result.resources,[]);
+  assert.ok(call.error);
+  const [shown] = run('server.mjs',lines.slice(0,1),undefined,undefined,{...only,CLAUDE_CODE_ENTRYPOINT:'t3-code'});
+  assert.ok(shown.result.tools.some(t => t.name === 'show_timer'));
 });
 test('first-prompt guidance is available at any hour and respects the standalone opt-out', () => {
   const event = prompt => ({hook_event_name:'UserPromptSubmit',prompt});

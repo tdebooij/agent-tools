@@ -1,6 +1,6 @@
 {
   "name": "harvest-live",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Harvest time tracking above the Claude Code prompt: suggests a project, task and description from the first prompt of each new chat and starts the timer in one press.",
   "author": {
     "name": "tdebooij",
@@ -17,6 +17,17 @@
   ],
   "icon": "./.claude-plugin/icon.png",
   "types": "./types/index.d.ts",
+  "mcpServers": {
+    "harvest-card": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/t3-card/server.mjs"
+      ],
+      "env": {
+        "HARVEST_LIVE_ONLY_ENTRYPOINT": "t3-code"
+      }
+    }
+  },
   "userConfig": {
     "harvestToken": {
       "type": "string",

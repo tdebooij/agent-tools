@@ -110,16 +110,21 @@ async function personal(name,args) {
   });
 }
 
+// Set by a host that should offer the card only under one Claude Code entrypoint (the Claude mod: t3-code). Codex leaves it unset.
+const only = process.env.HARVEST_LIVE_ONLY_ENTRYPOINT;
+const offered = !only || only === process.env.CLAUDE_CODE_ENTRYPOINT;
+
 async function dispatch(method, params = {}) {
+  if (!offered && ['tools/call','resources/read'].includes(method)) throw { code: -32602, message: 'Harvest Live is not offered here' };
   switch (method) {
     case 'initialize': return {
       protocolVersion: ['2024-11-05','2025-03-26','2025-06-18','2025-11-25'].includes(params.protocolVersion) ? params.protocolVersion : '2025-11-25',
       capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'harvest-live', version: '0.2.5' }
     };
     case 'ping': return {};
-    case 'tools/list': return { tools: [tool, settings, save, ...personalTools] };
+    case 'tools/list': return { tools: offered ? [tool, settings, save, ...personalTools] : [] };
     case 'resources/templates/list': return { resourceTemplates: [] };
-    case 'resources/list': return { resources: [resource] };
+    case 'resources/list': return { resources: offered ? [resource] : [] };
     case 'resources/read':
       if (params.uri !== uri && !['ui://harvest-live/timer-v1.html','ui://harvest-live/timer-v2.html','ui://harvest-live/timer-v3.html','ui://harvest-live/timer-v4.html','ui://harvest-live/timer-v5.html','ui://harvest-live/timer-v6.html'].includes(params.uri)) break;
       return { contents: [{ ...resource, uri: params.uri, text: readFileSync(new URL('./timer.html', import.meta.url), 'utf8') }] };

@@ -419,8 +419,43 @@ const ICONS = {
   error: { glyph: '!', color: 'warning' },
 } as const
 
+// T3 Code draws no band, but it does draw MCP App cards. The plugin's harvest-card server (the Codex
+// Harvest Live card in t3-card/) lists its tools only when CLAUDE_CODE_ENTRYPOINT is t3-code, so the
+// card tool being there is how the mod knows it runs in T3. Everywhere else the band works as before.
+const CARD_TOOL = /^mcp__plugin_harvest-live_harvest-card__show_timer$/
+const cardTool = async ($: any): Promise<string | undefined> => {
+  try {
+    return (await $.tool.list()).find((t: { name: string }) => CARD_TOOL.test(t.name))?.name
+  } catch {
+    return undefined // no tool list (a test, an old engine): the band, as before
+  }
+}
+
+const cardHint = (tool: string) => {
+  const server = tool.replace(/__show_timer$/, '__')
+  return (
+    'Harvest Live check for today. On this first in-hours message today, open one fresh editable Harvest card: ' +
+    `call ${server}read_personal_context to read the saved account, assigned projects/tasks and the running timer. ` +
+    `If no account is configured or it is rejected, call ${server}show_account with notes (3-10 words on the actual work, including any ticket ID), ` +
+    'project_hint (the likely product or project from the request or repository) and task_hint (the likely discipline). ' +
+    `Otherwise call ${tool} with connection_ref set to the returned account.ref, a concrete notes description, and the IDs of the best supported project and task; ` +
+    'leave an uncertain selection empty and never invent IDs. ' +
+    'Only the card can start or switch a timer: never repeat a card action. Do not look for other Harvest connectors or tokens. ' +
+    'Continue the main request immediately and do not otherwise mention Harvest.'
+  )
+}
+
 // /harvest alone seeds the first project; /harvest <what you are doing> gets a real suggestion for that text.
-async function onCommand($: any, e: any) {
+async function onCommand($: any, e: any): Promise<{ text: string; isTextDisplayOnly?: true }> {
+  const card = await cardTool($)
+  if (card) {
+    // Under T3 the card is the model's to open: ask for it in a turn of its own. A command.run hook
+    // can't submit (it would wait on the turn it holds), so the submit goes out once the hook returns.
+    const work = e.args.trim() === 'refresh' ? '' : e.args.trim()
+    const text = `Open Harvest Live${work ? ` for this work: ${work}` : ' for the current work'}. ${cardHint(card)}`
+    $.clock.after(1, () => void $.prompt.submit({ text }))
+    return { text: 'Opening the Harvest card…', isTextDisplayOnly: true }
+  }
   if (e.args.trim() === 'refresh') {
     for (const key of await $.store.keys()) if (key === 'catalog' || key === 'me') await $.store.delete(key)
     await $.state.set(projects, [])
@@ -497,17 +532,29 @@ export const register: Register = (on, options) => {
     const now = new Date(await $.clock.now())
     const isWork = isWorkTime(now)
     const today = now.toDateString()
-    const { value: lastDay = '' } = await $.state.get(day)
+    const { value: stateDay = '' } = await $.state.get(day)
+    // $.state lives as long as the process. T3 Code starts one per turn, so the day is also kept per chat in the store.
+    const sessionId = await $.session.id()
+    const days = ((await $.store.get('days')) ?? {}) as Record<string, string>
+    const lastDay = stateDay === today ? stateDay : (days[sessionId] ?? stateDay)
+    const markDay = async () => {
+      await $.state.set(day, today)
+      const kept = Object.fromEntries(Object.entries(days).filter(([, d]) => d === today)) // older days are done with
+      await $.store.set('days', { ...kept, [sessionId]: today })
+    }
     // --no-harvest anywhere in a prompt: no band for the rest of this chat today, and the flag doesn't reach Claude.
     if (/(^|\s)--no-harvest(?=\s|$)/.test(e.text)) {
-      await $.state.set(day, today)
+      await markDay()
       await $.state.set(isOpen, false)
       // Only the flag and the spaces before it go: line breaks in the prompt stay.
       const text = e.text.replace(/[ \t]*(^|(?<=\s))--no-harvest(?=\s|$)/gm, '').trim()
       return next({ ...e, text: text || e.text })
     }
     if (isWork && lastDay !== today) {
-      await $.state.set(day, today)
+      await markDay()
+      // T3 Code: the card replaces the band, with its own account (shared with Codex).
+      const card = await cardTool($)
+      if (card) return next({ ...e, context: [...(e.context ?? []), cardHint(card)] })
       await $.state.set(isOpen, true)
       if (!creds.token && !isDemo) return next(e)
       void loadRunning($)
