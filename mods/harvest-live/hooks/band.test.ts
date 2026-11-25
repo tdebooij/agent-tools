@@ -189,3 +189,58 @@ test('demo mode shows made-up projects and starts a timer without calling Harves
   expect(calls.length).toBe(0)
   await ui.unmount()
 })
+
+test('under T3 Code (the card server lists its tools) /harvest asks Claude for the card and draws no band', CONNECTED, async ($, on) => {
+  const clock = mock.clock(on)
+  mock.store(on)
+  on('ui.render', ($, e) => h($.ui.resolve(e).Box, {}) as never)
+  const calls: string[] = []
+  harvestStub(on, calls)
+  on('tool.list', () => ({ value: [{ name: 'mcp__plugin_harvest-live_harvest-card__show_timer' }] }) as never)
+  const prompts: string[] = []
+  on('prompt.submit', (_$: unknown, e: { text: string }) => {
+    prompts.push(e.text)
+    return { text: e.text } as never
+  })
+  const ran = await $.command.run({ command: 'harvest', args: 'ABC-42 fix login' } as never)
+  await clock.advance(1000)
+  expect((ran as { text?: string }).text).toBe('Opening the Harvest card…')
+  expect(prompts.length).toBe(1)
+  expect(prompts[0]).toContain('ABC-42 fix login')
+  expect(prompts[0]).toContain('mcp__plugin_harvest-live_harvest-card__show_timer')
+  expect(calls).toEqual([])
+  const ui = await $.ui.mount({ plugin: 'harvest-live', surface: 'desktop', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /^Harvest$/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+const CARD_HINT = 'Harvest Live check for today'
+const SESSION = 'chat-1'
+const hintsOn = (on: any) => {
+  on('session.id', () => ({ value: SESSION }) as never)
+  on('tool.list', () => ({ value: [{ name: 'mcp__plugin_harvest-live_harvest-card__show_timer' }] }) as never)
+  const seen: boolean[] = []
+  on('prompt.submit', (_$: unknown, e: { text: string; context?: string[] }) => {
+    seen.push((e.context ?? []).some(c => c.includes(CARD_HINT)))
+    return { text: e.text } as never
+  })
+  return seen
+}
+const WEEKDAY_10AM = new Date('2026-11-25T10:00:00').getTime()
+
+test('under T3 Code the card hint goes out on the first in-hours prompt, once', async ($, on) => {
+  mock.clock(on, { now: WEEKDAY_10AM })
+  mock.store(on)
+  const seen = hintsOn(on)
+  await $.prompt.submit({ text: 'first' } as never)
+  await $.prompt.submit({ text: 'second' } as never)
+  expect(seen).toEqual([true, false])
+})
+
+test('under T3 Code a fresh process for the next turn (no session state) does not send the hint again', async ($, on) => {
+  mock.clock(on, { now: WEEKDAY_10AM })
+  mock.store(on, { days: { [SESSION]: new Date(WEEKDAY_10AM).toDateString() } })
+  const seen = hintsOn(on)
+  await $.prompt.submit({ text: 'next turn' } as never)
+  expect(seen).toEqual([false])
+})

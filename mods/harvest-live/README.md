@@ -80,6 +80,16 @@ echo '{"demo": true}' | claude plugin configure harvest-live@agent-tools --value
 
 Set it back to `false` to use your real account.
 
+## In T3 Code
+
+T3 Code runs Claude Code through the Agent SDK and draws no band, but it does draw MCP App cards. So under T3 Code this mod shows the [Codex Harvest Live card](../../plugins/harvest-live) instead:
+
+- The plugin ships that card's server in `t3-card/` as the `harvest-card` MCP server. It lists its tools only when `CLAUDE_CODE_ENTRYPOINT` is `t3-code`, so the Claude Code terminal and desktop app never see them and keep the band.
+- On the first in-hours prompt of the day, Claude opens the card instead of the band. `/harvest` asks Claude to open it. `--no-harvest` works as before.
+- The card keeps its own account, shared with the Codex plugin (`~/.config/harvest-live` and the macOS Keychain), not this mod's `harvestToken`. Connect once in the card. When the day's card opens is decided by this mod's working hours; the card's own working-hours view sets the Codex schedule.
+
+`t3-card/` is a copy of `plugins/harvest-live`. After changing the card there, run `node mods/harvest-live/t3-card/sync.mjs` (`--check` reports a stale copy).
+
 ## Privacy
 
 This is an independent project, not made or endorsed by Harvest.
